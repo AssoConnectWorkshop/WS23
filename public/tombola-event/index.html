@@ -6,7 +6,6 @@
 <title>Tombola — Domaine de la Pierre à Sel</title>
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tone@14.7.77/build/Tone.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js" onload="window._qrReady=true" onerror="window._qrFailed=true"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -345,41 +344,13 @@ function generateQR(elId) {
   const el = document.getElementById(elId);
   if (!el) return;
   el.innerHTML = '';
-
-  function tryLibrary() {
-    try {
-      // qrcode-generator API: qrcode(typeNumber, errorCorrectionLevel)
-      const qr = qrcode(0, 'M');
-      qr.addData(url);
-      qr.make();
-      // createSvgTag(cellSize, margin, alt)
-      const svg = qr.createSvgTag({ cellSize: 5, margin: 2, scalable: true });
-      el.innerHTML = svg;
-      const svgEl = el.querySelector('svg');
-      if (svgEl) svgEl.style.cssText = 'width:180px;height:180px;border-radius:8px;display:block;';
-    } catch(e) { fallback(); }
-  }
-
-  function fallback() {
-    const img = document.createElement('img');
-    img.width = 180; img.height = 180;
-    img.style.cssText = 'width:180px;height:180px;border-radius:8px;display:block;';
-    img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' + encodeURIComponent(url) + '&color=1E4FCC&bgcolor=FFFFFF&margin=10';
-    img.onerror = () => { el.innerHTML = '<p style="color:#888;font-size:12px;padding:20px;">QR indisponible —<br>utilisez le bouton ci-dessous</p>'; };
-    el.innerHTML = '';
-    el.appendChild(img);
-  }
-
-  if (typeof qrcode === 'function') {
-    tryLibrary();
-  } else {
-    let waited = 0;
-    const poll = setInterval(() => {
-      waited += 100;
-      if (typeof qrcode === 'function') { clearInterval(poll); tryLibrary(); }
-      else if (waited >= 2000) { clearInterval(poll); fallback(); }
-    }, 100);
-  }
+  const encoded = encodeURIComponent(url);
+  const img = document.createElement('img');
+  img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' + encoded + '&color=1E4FCC&bgcolor=FFFFFF&margin=10';
+  img.alt = 'QR Code inscription';
+  img.style.cssText = 'width:180px;height:180px;border-radius:8px;display:block;';
+  img.onerror = () => { el.innerHTML = '<p style="color:#888;font-size:12px;padding:20px;">QR indisponible —<br>utilisez le bouton ci-dessous</p>'; };
+  el.appendChild(img);
 }
 
 // ============================================================
