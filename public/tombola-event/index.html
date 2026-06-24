@@ -453,7 +453,6 @@ function exportResults() {
 // ============================================================
 let activeNodes = [];
 let drumLoop = null;
-let drumTransportStarted = false;
 
 async function startAudio() {
   if (Tone.context.state !== 'running') await Tone.start();
@@ -461,30 +460,31 @@ async function startAudio() {
 
 function stopAll() {
   if (drumLoop) { try { drumLoop.stop(0); drumLoop.dispose(); } catch {} drumLoop = null; }
-  activeNodes.forEach(n => { try { n.stop(0); n.dispose(); } catch {} });
+  activeNodes.forEach(n => { try { n.dispose(); } catch {} });
   activeNodes = [];
   try { Tone.Transport.stop(); Tone.Transport.cancel(); } catch {}
 }
 
+// Real snare drum roll
 function playDrumroll(durationMs) {
   stopAll();
-  // Machine gun: fast metallic clicks + white noise bursts
-  const click = new Tone.MembraneSynth({
-    pitchDecay: 0.005,
-    octaves: 3,
-    envelope: { attack: 0.001, decay: 0.04, sustain: 0, release: 0.01 },
-    volume: -2
-  }).toDestination();
-  const noise = new Tone.NoiseSynth({
+  const snare = new Tone.NoiseSynth({
     noise: { type: 'white' },
-    envelope: { attack: 0.001, decay: 0.025, sustain: 0, release: 0.01 },
-    volume: -10
+    envelope: { attack: 0.001, decay: 0.07, sustain: 0, release: 0.04 },
+    volume: -7
   }).toDestination();
-  activeNodes.push(click, noise);
-  Tone.Transport.bpm.value = 480;
+  const kick = new Tone.MembraneSynth({
+    pitchDecay: 0.05, octaves: 5,
+    envelope: { attack: 0.001, decay: 0.18, sustain: 0, release: 0.1 },
+    volume: -4
+  }).toDestination();
+  activeNodes.push(snare, kick);
+  Tone.Transport.bpm.value = 160;
+  let beat = 0;
   const loop = new Tone.Loop(time => {
-    click.triggerAttackRelease('C1', '64n', time);
-    noise.triggerAttackRelease('64n', time);
+    snare.triggerAttackRelease('16n', time);
+    if (beat % 16 === 0 || beat % 16 === 8) kick.triggerAttackRelease('C1', '8n', time);
+    beat++;
   }, '16n');
   loop.start(0);
   Tone.Transport.start();
@@ -517,11 +517,42 @@ function playFanfare(level) {
   }
 }
 
-function playBeep() {
-  const s = new Tone.Synth({ oscillator:{type:'sine'}, envelope:{attack:0.01,decay:0.15,sustain:0,release:0.1}, volume:-4 }).toDestination();
+// Mario Kart-style countdown beep (square wave, short decay)
+function playCountdownBeep(isGo) {
+  const s = new Tone.Synth({
+    oscillator: { type: 'square' },
+    envelope: { attack: 0.001, decay: 0.06, sustain: 0.15, release: 0.18 },
+    volume: -8
+  }).toDestination();
   activeNodes.push(s);
   const t = Tone.now();
-  s.triggerAttackRelease('A4','16n', t);
+  s.triggerAttackRelease(isGo ? 'B5' : 'B4', isGo ? '8n' : '16n', t);
+}
+
+// Cat meow using raw Web Audio API frequency sweep
+function playCatMeow() {
+  const ctx = Tone.context.rawContext;
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const filt = ctx.createBiquadFilter();
+  filt.type = 'bandpass';
+  filt.frequency.value = 1100;
+  filt.Q.value = 4;
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(420, now);
+  osc.frequency.linearRampToValueAtTime(860, now + 0.18);
+  osc.frequency.linearRampToValueAtTime(620, now + 0.45);
+  osc.frequency.linearRampToValueAtTime(480, now + 0.65);
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(0.38, now + 0.07);
+  gain.gain.setValueAtTime(0.38, now + 0.4);
+  gain.gain.linearRampToValueAtTime(0, now + 0.72);
+  osc.connect(filt);
+  filt.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + 0.8);
 }
 
 // ============================================================
@@ -553,9 +584,10 @@ function typewriter(elId, text, speed=80) {
 async function showCountdown(color='#ffd700') {
   for (const n of [3,2,1]) {
     setCeremony(`<div class="countdown-num" style="color:${color};">${n}</div>`);
-    playBeep();
+    playCountdownBeep(false);
     await wait(950);
   }
+  playCountdownBeep(true);
 }
 
 function fireConfetti(level) {
@@ -769,6 +801,8 @@ async function phase5() {
     </div>
   `);
 
+  playCatMeow();
+  setTimeout(() => playCatMeow(), 900);
   confetti({ particleCount:70, spread:80, colors:['#ffd700','#ffa500','#fff8dc','#ffec00'], shapes:['star'], gravity:0.5, origin:{y:0.4} });
   await wait(7000);
 }
