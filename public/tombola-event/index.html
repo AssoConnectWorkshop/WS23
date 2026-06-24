@@ -113,6 +113,9 @@ body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background
 .star { position: fixed; pointer-events: none; z-index: 1; animation: floatStar linear; }
 .rain-emoji { position: fixed; pointer-events: none; z-index: 3; animation: rainDrop linear; }
 
+@keyframes dotPulse { 0%,80%,100%{transform:scale(0.6);opacity:0.4} 40%{transform:scale(1);opacity:1} }
+.dot-pulse { width: 10px; height: 10px; background: var(--blue); border-radius: 50%; animation: dotPulse 1.2s ease-in-out var(--d) infinite; }
+
 .chat-frame-wrap {
   position: relative; display: inline-block;
   border: 5px solid #ffd700; border-radius: 14px;
@@ -184,7 +187,32 @@ body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background
   <div class="checkmark">✓</div>
   <h2 style="font-size: 30px; font-weight: 800; color: var(--blue); animation: fadeInUp 0.5s ease 0.3s both;">Vous êtes inscrit(e) !</h2>
   <p id="confirm-name" style="font-size: 24px; font-weight: 700; color: var(--blue-light); animation: fadeInUp 0.5s ease 0.5s both;"></p>
-  <p style="color: #666; font-size: 16px; animation: fadeInUp 0.5s ease 0.7s both;">Bonne chance 🎉 Rendez-vous pour le tirage !</p>
+  <p style="color: #666; font-size: 16px; animation: fadeInUp 0.5s ease 0.7s both;">Bonne chance 🎉</p>
+  <p style="color: #aaa; font-size: 14px; animation: fadeInUp 0.5s ease 0.9s both;">Redirection dans <span id="confirm-countdown">3</span>s…</p>
+</div>
+
+<!-- ========== WAITING ========== -->
+<div id="screen-waiting" class="screen" style="padding: 40px; text-align: center; gap: 28px; background: linear-gradient(160deg, #f0f4ff 0%, #e8f8f4 100%);">
+  <div class="logo">🎟️</div>
+  <h1 style="font-size: clamp(22px, 4vw, 34px); font-weight: 800; color: var(--blue); line-height: 1.25;">
+    Tombola du Domaine<br>de la Pierre à Sel
+  </h1>
+
+  <div style="background: white; border-radius: 20px; padding: 28px 32px; box-shadow: 0 4px 20px rgba(0,0,0,0.07); max-width: 360px; width: 100%; display: flex; flex-direction: column; gap: 16px;">
+    <div style="font-size: 40px;">⏳</div>
+    <p style="font-size: 20px; font-weight: 700; color: var(--blue);">Le tirage arrive bientôt !</p>
+    <p style="color: #888; font-size: 15px; line-height: 1.5;">Restez dans les parages…<br>le grand moment approche 🎉</p>
+    <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 4px;">
+      <div class="dot-pulse" style="--d:0s"></div>
+      <div class="dot-pulse" style="--d:0.2s"></div>
+      <div class="dot-pulse" style="--d:0.4s"></div>
+    </div>
+  </div>
+
+  <div style="background: white; border-radius: 16px; padding: 20px 28px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); max-width: 360px; width: 100%;">
+    <p style="font-size: 13px; color: #aaa; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.08em;">Participants inscrits</p>
+    <div id="waiting-count" style="font-size: 48px; font-weight: 900; color: var(--blue); line-height: 1;">0</div>
+  </div>
 </div>
 
 <!-- ========== ADMIN ========== -->
@@ -338,6 +366,29 @@ function register() {
   document.getElementById('input-prenom').value = '';
   document.getElementById('input-nom').value = '';
   showScreen('confirm');
+  // Countdown then redirect to waiting screen
+  let n = 3;
+  const cdEl = document.getElementById('confirm-countdown');
+  const iv = setInterval(() => {
+    n--;
+    if (cdEl) cdEl.textContent = n;
+    if (n <= 0) { clearInterval(iv); showWaiting(); }
+  }, 1000);
+}
+
+function showWaiting() {
+  showScreen('waiting');
+  updateWaitingCount();
+  // Refresh count every 5s in case others register
+  const iv = setInterval(() => {
+    if (!document.getElementById('screen-waiting').classList.contains('active')) { clearInterval(iv); return; }
+    updateWaitingCount();
+  }, 5000);
+}
+
+function updateWaitingCount() {
+  const el = document.getElementById('waiting-count');
+  if (el) { const n = getP().length; el.textContent = n; el.style.animation='none'; el.offsetHeight; el.style.animation='countPulse 0.4s ease'; }
 }
 
 // ============================================================
