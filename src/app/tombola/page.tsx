@@ -2,6 +2,11 @@
 
 import React, { useState, useRef } from "react";
 
+const BLUE = "#2952E3";
+const TEAL = "#00C2A8";
+const BLUE_LIGHT = "#EEF2FF";
+const BLUE_MID = "#C7D2FD";
+
 interface Participant {
   id: number;
   name: string;
@@ -20,9 +25,9 @@ interface Prize {
 }
 
 const PRIZES: Prize[] = [
-  { rank: 1, emoji: "🥇", label: "1er prix", description: "T-shirt AssoConnect" },
-  { rank: 2, emoji: "🥈", label: "2e prix", description: "Shot" },
-  { rank: 3, emoji: "🥉", label: "3e prix", description: "Porte-clé AssoConnect" },
+  { rank: 1, emoji: "👕", label: "1er prix", description: "T-shirt AssoConnect" },
+  { rank: 2, emoji: "🥃", label: "2e prix", description: "Shot" },
+  { rank: 3, emoji: "🔑", label: "3e prix", description: "Porte-clé AssoConnect" },
 ];
 
 export default function Tombola() {
@@ -78,40 +83,45 @@ export default function Tombola() {
   const canDraw = participants.length >= PRIZES.length;
 
   return (
-    <main className="min-h-screen p-6 flex flex-col items-center gap-8" style={{ backgroundColor: "#f0f4ff" }}>
-      <div className="flex flex-col items-center gap-2 text-center">
-        <span className="text-6xl">🎟️</span>
-        <h1 className="text-4xl font-bold" style={{ color: "#1a1a2e" }}>Tombola AssoConnect</h1>
-        <p style={{ color: "#2764F0" }} className="text-lg font-medium">Tirez au sort vos gagnants en toute transparence</p>
+    <main className="min-h-screen p-6 flex flex-col items-center gap-8" style={{ backgroundColor: "#F4F6FB" }}>
+
+      {/* Header */}
+      <div className="w-full max-w-2xl rounded-2xl p-8 flex flex-col items-center gap-2 text-center text-white"
+        style={{ background: `linear-gradient(135deg, ${BLUE} 0%, ${TEAL} 100%)` }}>
+        <span className="text-5xl">🎟️</span>
+        <h1 className="text-3xl font-bold">Tombola AssoConnect</h1>
+        <p className="opacity-90 text-base">Tirez au sort vos gagnants en toute transparence</p>
       </div>
 
-      <div className="w-full max-w-2xl flex flex-col gap-6">
+      <div className="w-full max-w-2xl flex flex-col gap-5">
 
-        {/* Lots à gagner */}
-        <section className="bg-white rounded-2xl p-6 shadow-md flex flex-col gap-3" style={{ borderTop: "3px solid #2764F0" }}>
-          <h2 className="text-lg font-semibold" style={{ color: "#2764F0" }}>Lots à gagner</h2>
+        {/* Lots */}
+        <section className="bg-white rounded-2xl p-6 shadow-sm flex flex-col gap-3" style={{ border: `1px solid ${BLUE_MID}` }}>
+          <h2 className="text-base font-semibold flex items-center gap-2" style={{ color: BLUE }}>
+            <span style={{ color: TEAL }}>●</span> Lots à gagner
+          </h2>
           <div className="flex flex-col gap-2">
             {PRIZES.map((prize) => (
-              <div key={prize.rank} className="flex items-center gap-3 rounded-xl px-4 py-3" style={{ backgroundColor: "#f0f4ff" }}>
-                <span className="text-2xl">{prize.emoji}</span>
-                <div>
-                  <span className="text-sm font-semibold" style={{ color: "#2764F0" }}>{prize.label}</span>
-                  <span className="text-sm text-gray-600"> — {prize.description}</span>
-                </div>
+              <div key={prize.rank} className="flex items-center gap-3 rounded-xl px-4 py-3" style={{ backgroundColor: BLUE_LIGHT }}>
+                <span className="text-xl">{prize.emoji}</span>
+                <span className="text-sm font-semibold" style={{ color: BLUE }}>{prize.label}</span>
+                <span className="text-sm text-gray-500">— {prize.description}</span>
               </div>
             ))}
           </div>
         </section>
 
         {/* Participants */}
-        <section className="bg-white rounded-2xl p-6 shadow-md flex flex-col gap-4" style={{ borderTop: "3px solid #2764F0" }}>
-          <h2 className="text-lg font-semibold" style={{ color: "#2764F0" }}>Participants</h2>
+        <section className="bg-white rounded-2xl p-6 shadow-sm flex flex-col gap-4" style={{ border: `1px solid ${BLUE_MID}` }}>
+          <h2 className="text-base font-semibold flex items-center gap-2" style={{ color: BLUE }}>
+            <span style={{ color: TEAL }}>●</span> Participants
+          </h2>
           <div className="flex gap-2">
             <textarea
               className="flex-1 rounded-xl px-4 py-2 text-sm resize-none focus:outline-none"
-              style={{ border: "1.5px solid #c7d7fd" }}
-              onFocus={(e) => (e.currentTarget.style.boxShadow = "0 0 0 2px #2764F0")}
-              onBlur={(e) => (e.currentTarget.style.boxShadow = "none")}
+              style={{ border: `1.5px solid ${BLUE_MID}` }}
+              onFocus={(e) => (e.currentTarget.style.borderColor = BLUE)}
+              onBlur={(e) => (e.currentTarget.style.borderColor = BLUE_MID)}
               rows={2}
               placeholder="Un nom par ligne, ou séparés par virgule/point-virgule…"
               value={input}
@@ -125,10 +135,10 @@ export default function Tombola() {
             />
             <button
               onClick={() => addParticipant(input)}
-              className="px-4 py-2 text-white font-semibold rounded-xl transition-all active:scale-95"
-              style={{ backgroundColor: "#2764F0" }}
-              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#1a50d4")}
-              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#2764F0")}
+              className="px-4 py-2 text-white font-semibold rounded-xl transition-all active:scale-95 text-sm"
+              style={{ backgroundColor: BLUE }}
+              onMouseOver={(e) => (e.currentTarget.style.opacity = "0.85")}
+              onMouseOut={(e) => (e.currentTarget.style.opacity = "1")}
             >
               Ajouter
             </button>
@@ -139,21 +149,21 @@ export default function Tombola() {
               {participants.map((p) => (
                 <span
                   key={p.id}
-                  className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium transition-all duration-300 ${highlighted === p.id ? "scale-110 shadow-lg" : ""}`}
+                  className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium transition-all duration-300 ${highlighted === p.id ? "scale-110 shadow-md" : ""}`}
                   style={
                     highlighted === p.id
-                      ? { backgroundColor: "#ffd600", color: "#1a1a2e" }
+                      ? { backgroundColor: TEAL, color: "#fff" }
                       : winners?.some((w) => w.participant.id === p.id)
-                      ? { backgroundColor: "#e6edff", color: "#2764F0", textDecoration: "line-through", opacity: 0.5 }
-                      : { backgroundColor: "#e6edff", color: "#2764F0" }
+                      ? { backgroundColor: BLUE_LIGHT, color: BLUE, textDecoration: "line-through", opacity: 0.5 }
+                      : { backgroundColor: BLUE_LIGHT, color: BLUE }
                   }
                 >
                   {p.name}
                   {!drawing && (
                     <button
                       onClick={() => removeParticipant(p.id)}
-                      className="ml-1 font-bold leading-none hover:text-red-500"
-                      style={{ color: "#7ca4f8" }}
+                      className="ml-1 font-bold leading-none hover:text-red-400"
+                      style={{ color: BLUE_MID }}
                     >
                       ×
                     </button>
@@ -165,7 +175,7 @@ export default function Tombola() {
             <p className="text-sm text-gray-400 italic">Aucun participant pour l&apos;instant.</p>
           )}
 
-          <div className="flex items-center justify-between text-sm" style={{ color: "#2764F0" }}>
+          <div className="flex items-center justify-between text-sm" style={{ color: BLUE }}>
             <span>{participants.length} participant{participants.length > 1 ? "s" : ""}</span>
             {participants.length > 0 && !drawing && (
               <button onClick={reset} className="text-xs underline text-red-400 hover:text-red-600">
@@ -175,42 +185,40 @@ export default function Tombola() {
           </div>
         </section>
 
-        {/* Tirage */}
-        <section className="bg-white rounded-2xl p-6 shadow-md flex flex-col gap-4" style={{ borderTop: "3px solid #2764F0" }}>
-          <button
-            onClick={draw}
-            disabled={!canDraw || drawing}
-            className={`w-full py-4 rounded-xl text-white text-xl font-bold transition-all ${
-              canDraw && !drawing ? "active:scale-95 shadow-md" : "cursor-not-allowed"
-            } ${drawing ? "animate-pulse" : ""}`}
-            style={{ backgroundColor: canDraw && !drawing ? "#2764F0" : "#d1d5db" }}
-            onMouseOver={(e) => { if (canDraw && !drawing) e.currentTarget.style.backgroundColor = "#1a50d4"; }}
-            onMouseOut={(e) => { if (canDraw && !drawing) e.currentTarget.style.backgroundColor = "#2764F0"; }}
-          >
-            {drawing ? "🥁 Tirage en cours…" : "🎉 Lancer le tirage !"}
-          </button>
+        {/* Bouton tirage */}
+        <button
+          onClick={draw}
+          disabled={!canDraw || drawing}
+          className={`w-full py-4 rounded-2xl text-white text-lg font-bold transition-all shadow-md ${
+            canDraw && !drawing ? "active:scale-95" : "cursor-not-allowed opacity-40"
+          } ${drawing ? "animate-pulse" : ""}`}
+          style={{ background: canDraw && !drawing ? `linear-gradient(135deg, ${BLUE} 0%, ${TEAL} 100%)` : "#d1d5db" }}
+        >
+          {drawing ? "🥁 Tirage en cours…" : "🎉 Lancer le tirage !"}
+        </button>
 
-          {!canDraw && (
-            <p className="text-xs text-center" style={{ color: "#2764F0", opacity: 0.6 }}>
-              Il faut au moins {PRIZES.length} participants pour lancer le tirage.
-            </p>
-          )}
-        </section>
+        {!canDraw && (
+          <p className="text-xs text-center" style={{ color: BLUE, opacity: 0.6 }}>
+            Il faut au moins {PRIZES.length} participants pour lancer le tirage.
+          </p>
+        )}
 
         {/* Résultats */}
         {winners && winners.length > 0 && (
-          <section className="bg-white rounded-2xl p-6 shadow-md flex flex-col gap-4" style={{ borderTop: "3px solid #2764F0" }}>
-            <h2 className="text-lg font-semibold" style={{ color: "#2764F0" }}>🏆 Résultats du tirage</h2>
+          <section className="bg-white rounded-2xl p-6 shadow-sm flex flex-col gap-4" style={{ border: `1px solid ${BLUE_MID}` }}>
+            <h2 className="text-base font-semibold flex items-center gap-2" style={{ color: BLUE }}>
+              <span style={{ color: TEAL }}>●</span> Résultats du tirage
+            </h2>
             <ol className="flex flex-col gap-3">
               {winners.map((w) => (
                 <li
                   key={w.participant.id}
                   className="flex items-center gap-4 rounded-xl px-5 py-4"
-                  style={{ backgroundColor: "#e6edff", border: "1.5px solid #c7d7fd" }}
+                  style={{ background: `linear-gradient(135deg, ${BLUE_LIGHT} 0%, #e0faf7 100%)`, border: `1px solid ${BLUE_MID}` }}
                 >
                   <span className="text-3xl">{w.prize.emoji}</span>
                   <div className="flex flex-col">
-                    <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: "#2764F0" }}>
+                    <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: TEAL }}>
                       {w.prize.label} — {w.prize.description}
                     </span>
                     <span className="text-lg font-bold" style={{ color: "#1a1a2e" }}>{w.participant.name}</span>
@@ -222,7 +230,7 @@ export default function Tombola() {
               onClick={draw}
               disabled={drawing}
               className="text-sm underline self-center"
-              style={{ color: "#2764F0" }}
+              style={{ color: BLUE }}
             >
               Relancer un tirage
             </button>
