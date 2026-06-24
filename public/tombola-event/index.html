@@ -291,21 +291,29 @@ body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background
 
 <script>
 // ============================================================
-// STORAGE
+// API
 // ============================================================
-const KEY = 'tombola_participants_psel';
-function getP() { try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; } }
-function saveP(list) { localStorage.setItem(KEY, JSON.stringify(list)); }
-function addP(prenom, nom) {
-  const list = getP();
-  list.push({ id: Date.now(), prenom, nom, ts: new Date().toISOString() });
-  saveP(list);
-  updateCounter();
+const API = '/api/tombola/participants';
+let cachedParticipants = [];
+
+async function fetchParticipants() {
+  try {
+    const r = await fetch(API);
+    cachedParticipants = await r.json();
+  } catch { cachedParticipants = []; }
+  return cachedParticipants;
 }
-function clearParticipants() {
+
+async function addP(prenom, nom) {
+  await fetch(API, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ prenom, nom }) });
+  await fetchParticipants();
+}
+
+async function clearParticipants() {
   if (!confirm('Effacer tous les participants ?')) return;
-  localStorage.removeItem(KEY);
-  updateCounter(); renderAdminList();
+  await fetch(API, { method: 'DELETE' });
+  await fetchParticipants();
+  updateCounterFromCache(); renderAdminList();
 }
 
 let winners = {};
@@ -344,29 +352,35 @@ function generateQR(elId) {
 // ============================================================
 // COUNTER
 // ============================================================
-function updateCounter() {
-  const n = getP().length;
+function updateCounterFromCache() {
+  const n = cachedParticipants.length;
   const el = document.getElementById('counter-number');
   if (el) { el.textContent = n; el.style.animation = 'none'; el.offsetHeight; el.style.animation = 'countPulse 0.4s ease'; }
   const ac = document.getElementById('admin-count');
   if (ac) ac.textContent = n;
 }
+async function updateCounter() {
+  await fetchParticipants();
+  updateCounterFromCache();
+}
 
 // ============================================================
 // REGISTER
 // ============================================================
-function register() {
+async function register() {
   const prenom = document.getElementById('input-prenom').value.trim();
   const nom = document.getElementById('input-nom').value.trim();
   const err = document.getElementById('register-error');
+  const btn = document.querySelector('#screen-register .btn-primary');
   if (!prenom || !nom) { err.textContent = 'Veuillez remplir prénom et nom.'; return; }
   err.textContent = '';
-  addP(prenom, nom);
+  btn.disabled = true; btn.textContent = 'Inscription…';
+  await addP(prenom, nom);
+  btn.disabled = false; btn.textContent = "M'inscrire à la tombola 🎉";
   document.getElementById('confirm-name').textContent = prenom + ' ' + nom;
   document.getElementById('input-prenom').value = '';
   document.getElementById('input-nom').value = '';
   showScreen('confirm');
-  // Countdown then redirect to waiting screen
   let n = 3;
   const cdEl = document.getElementById('confirm-countdown');
   const iv = setInterval(() => {
@@ -386,22 +400,23 @@ function showWaiting() {
   }, 5000);
 }
 
-function updateWaitingCount() {
+async function updateWaitingCount() {
+  await fetchParticipants();
   const el = document.getElementById('waiting-count');
-  if (el) { const n = getP().length; el.textContent = n; el.style.animation='none'; el.offsetHeight; el.style.animation='countPulse 0.4s ease'; }
+  if (el) { el.textContent = cachedParticipants.length; el.style.animation='none'; el.offsetHeight; el.style.animation='countPulse 0.4s ease'; }
 }
 
 // ============================================================
 // ADMIN
 // ============================================================
-function renderAdmin() { updateCounter(); renderAdminList(); generateQR('admin-qr'); }
+async function renderAdmin() { await updateCounter(); renderAdminList(); generateQR('admin-qr'); }
 function renderAdminList() {
-  const list = getP();
+  const list = cachedParticipants;
   const el = document.getElementById('admin-list');
   if (!el) return;
   if (!list.length) { el.innerHTML = '<div style="padding:20px;text-align:center;color:#aaa;font-size:14px;">Aucun inscrit pour le moment</div>'; return; }
   el.innerHTML = list.map((p, i) =>
-    `<div class="participant-item"><span><b>${i+1}.</b> ${p.prenom} ${p.nom}</span><span style="color:#bbb;font-size:12px;">${new Date(p.ts).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</span></div>`
+    `<div class="participant-item"><span><b>${i+1}.</b> ${p.prenom} ${p.nom}</span><span style="color:#bbb;font-size:12px;">${new Date(p.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</span></div>`
   ).join('');
 }
 
@@ -583,7 +598,8 @@ function rainEmojis(list, count, totalMs) {
 // CEREMONY PHASES
 // ============================================================
 async function launchCeremony() {
-  const list = getP();
+  await fetchParticipants();
+  const list = cachedParticipants;
   const errEl = document.getElementById('launch-error');
   if (list.length < 3) { errEl.textContent = 'Il faut au moins 3 participants.'; return; }
   errEl.textContent = '';
