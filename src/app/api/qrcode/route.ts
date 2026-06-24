@@ -1,11 +1,12 @@
-import QRCode from "qrcode";
+import * as QRCode from "qrcode";
+
+export const runtime = "nodejs";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const data = searchParams.get("data");
-  if (!data) return new Response("missing data", { status: 400 });
+  const data = searchParams.get("data") ?? "";
 
-  const svg = await QRCode.toString(data, {
+  const svg = await QRCode.toString(data || "https://assoconnect-ws23.vercel.app/tombola-event/?participant=true", {
     type: "svg",
     width: 300,
     margin: 2,
@@ -15,7 +16,7 @@ export async function GET(req: Request) {
   return new Response(svg, {
     headers: {
       "Content-Type": "image/svg+xml",
-      "Cache-Control": "public, max-age=86400",
+      "Cache-Control": "public, max-age=3600",
     },
   });
 }
