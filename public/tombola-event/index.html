@@ -339,45 +339,18 @@ function restartAdmin() { winners = {}; showScreen('admin'); }
 // ============================================================
 // QR CODE
 // ============================================================
-let _qrLib = null;
-
-async function generateQR(elId) {
+function generateQR(elId) {
   const url = window.location.href.split('?')[0].split('#')[0] + '?participant=true';
   const el = document.getElementById(elId);
   if (!el) return;
   el.innerHTML = '';
-
-  // Try to load qrcode-generator via fetch (CORS: jsdelivr sends *)
-  if (!_qrLib) {
-    try {
-      const r = await fetch('https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js');
-      if (r.ok) {
-        const src = await r.text();
-        // eslint-disable-next-line no-new-func
-        _qrLib = new Function(src + '; return qrcode;')();
-      }
-    } catch(e) {}
-  }
-
-  if (_qrLib) {
-    try {
-      const qr = _qrLib(0, 'M');
-      qr.addData(url);
-      qr.make();
-      const svg = qr.createSvgTag({ cellSize: 5, margin: 2, scalable: true });
-      el.innerHTML = svg;
-      const s = el.querySelector('svg');
-      if (s) s.style.cssText = 'width:180px;height:180px;border-radius:8px;display:block;';
-      return;
-    } catch(e) {}
-  }
-
-  // Fallback: image distante
   const img = document.createElement('img');
-  img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' + encodeURIComponent(url) + '&color=1E4FCC&bgcolor=FFFFFF&margin=10';
+  img.width = 180; img.height = 180;
   img.style.cssText = 'width:180px;height:180px;border-radius:8px;display:block;';
+  // API Next.js sur le même domaine — aucune dépendance externe
+  img.src = '/api/qrcode?data=' + encodeURIComponent(url);
   img.onerror = () => {
-    el.innerHTML = '<div style="padding:16px;text-align:center;font-size:13px;color:#555;">Ouvrez ce lien :<br><a href="' + url + '" style="color:#1E4FCC;word-break:break-all;">' + url + '</a></div>';
+    el.innerHTML = '<div style="padding:12px;text-align:center;font-size:12px;color:#555;">Lien :<br><a href="' + url + '" style="color:#1E4FCC;word-break:break-all;font-size:11px;">' + url + '</a></div>';
   };
   el.appendChild(img);
 }
