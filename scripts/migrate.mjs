@@ -7,8 +7,8 @@ const PROJECT_REF = process.env.SUPABASE_PROJECT_REF || 'psftjpszvvkwlelysgze';
 const TOKEN = process.env.SUPABASE_ACCESS_TOKEN;
 
 if (!TOKEN) {
-  console.error('ERROR: SUPABASE_ACCESS_TOKEN is not set');
-  process.exit(1);
+  console.warn('SUPABASE_ACCESS_TOKEN is not set — skipping migrations');
+  process.exit(0);
 }
 
 const API = `https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query`;
