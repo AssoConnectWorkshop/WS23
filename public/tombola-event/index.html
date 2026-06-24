@@ -339,17 +339,46 @@ function restartAdmin() { winners = {}; showScreen('admin'); }
 // ============================================================
 // QR CODE
 // ============================================================
-function generateQR(elId) {
+let _qrLib = null;
+
+async function generateQR(elId) {
   const url = window.location.href.split('?')[0].split('#')[0] + '?participant=true';
   const el = document.getElementById(elId);
   if (!el) return;
   el.innerHTML = '';
-  const encoded = encodeURIComponent(url);
+
+  // Try to load qrcode-generator via fetch (CORS: jsdelivr sends *)
+  if (!_qrLib) {
+    try {
+      const r = await fetch('https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js');
+      if (r.ok) {
+        const src = await r.text();
+        // eslint-disable-next-line no-new-func
+        _qrLib = new Function(src + '; return qrcode;')();
+      }
+    } catch(e) {}
+  }
+
+  if (_qrLib) {
+    try {
+      const qr = _qrLib(0, 'M');
+      qr.addData(url);
+      qr.make();
+      const svg = qr.createSvgTag({ cellSize: 5, margin: 2, scalable: true });
+      el.innerHTML = svg;
+      const s = el.querySelector('svg');
+      if (s) s.style.cssText = 'width:180px;height:180px;border-radius:8px;display:block;';
+      return;
+    } catch(e) {}
+  }
+
+  // Fallback: image distante
   const img = document.createElement('img');
-  img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' + encoded + '&color=1E4FCC&bgcolor=FFFFFF&margin=10';
-  img.alt = 'QR Code inscription';
+  img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' + encodeURIComponent(url) + '&color=1E4FCC&bgcolor=FFFFFF&margin=10';
   img.style.cssText = 'width:180px;height:180px;border-radius:8px;display:block;';
-  img.onerror = () => { el.innerHTML = '<p style="color:#888;font-size:12px;padding:20px;">QR indisponible —<br>utilisez le bouton ci-dessous</p>'; };
+  img.onerror = () => {
+    el.innerHTML = '<div style="padding:16px;text-align:center;font-size:13px;color:#555;">Ouvrez ce lien :<br><a href="' + url + '" style="color:#1E4FCC;word-break:break-all;">' + url + '</a></div>';
+  };
   el.appendChild(img);
 }
 
