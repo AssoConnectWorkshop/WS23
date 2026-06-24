@@ -465,56 +465,98 @@ function stopAll() {
   try { Tone.Transport.stop(); Tone.Transport.cancel(); } catch {}
 }
 
-// Snare drum roll — double-stroke roll, 32nd notes at 120 BPM (~32 hits/sec)
+// Drum roll: caisse claire rapide + grosse caisse + charleston sur le tempo
 function playDrumroll(durationMs) {
   stopAll();
   const ctx = Tone.context.rawContext;
 
-  function hitSnare(when) {
-    // White noise burst through a bandpass filter — classic snare character
+  // Caisse claire : bruit blanc filtré
+  function hitSnare(when, vol) {
     const buf = ctx.createBuffer(1, ctx.sampleRate * 0.12, ctx.sampleRate);
     const data = buf.getChannelData(0);
     for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
     const src = ctx.createBufferSource();
     src.buffer = buf;
     const filt = ctx.createBiquadFilter();
-    filt.type = 'bandpass';
-    filt.frequency.value = 2200;
-    filt.Q.value = 0.8;
+    filt.type = 'bandpass'; filt.frequency.value = 2200; filt.Q.value = 0.9;
     const g = ctx.createGain();
-    g.gain.setValueAtTime(0.55, when);
-    g.gain.exponentialRampToValueAtTime(0.001, when + 0.11);
+    g.gain.setValueAtTime(vol || 0.5, when);
+    g.gain.exponentialRampToValueAtTime(0.001, when + 0.10);
     src.connect(filt); filt.connect(g); g.connect(ctx.destination);
-    src.start(when); src.stop(when + 0.13);
+    src.start(when); src.stop(when + 0.12);
   }
 
-  function hitKick(when) {
+  // Grosse caisse : sinus avec pitch-drop
+  function hitKick(when, vol) {
     const osc = ctx.createOscillator();
     const g = ctx.createGain();
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(150, when);
-    osc.frequency.exponentialRampToValueAtTime(40, when + 0.12);
-    g.gain.setValueAtTime(0.8, when);
-    g.gain.exponentialRampToValueAtTime(0.001, when + 0.18);
+    osc.frequency.setValueAtTime(160, when);
+    osc.frequency.exponentialRampToValueAtTime(38, when + 0.14);
+    g.gain.setValueAtTime(vol || 0.9, when);
+    g.gain.exponentialRampToValueAtTime(0.001, when + 0.22);
     osc.connect(g); g.connect(ctx.destination);
-    osc.start(when); osc.stop(when + 0.2);
+    osc.start(when); osc.stop(when + 0.25);
   }
 
-  const interval = 60 / 120 / 8; // 32nd note at 120 BPM ≈ 0.0625s
+  // Charleston : bruit blanc passe-haut très court
+  function hitHat(when, vol) {
+    const buf = ctx.createBuffer(1, ctx.sampleRate * 0.04, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const filt = ctx.createBiquadFilter();
+    filt.type = 'highpass'; filt.frequency.value = 8000;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(vol || 0.18, when);
+    g.gain.exponentialRampToValueAtTime(0.001, when + 0.035);
+    src.connect(filt); filt.connect(g); g.connect(ctx.destination);
+    src.start(when); src.stop(when + 0.045);
+  }
+
+  // Tempo : 120 BPM — 1 temps = 0.5s, 8e = 0.25s, 16e = 0.125s, 32e = 0.0625s
+  const beat = 60 / 120;       // 0.5s par temps
+  const eighth = beat / 2;     // charleston tous les 8e
+  const roll = beat / 8;       // caisse claire en 32e (roulement)
   const startTime = ctx.currentTime + 0.05;
-  let i = 0;
   let stopped = false;
 
-  function schedule() {
+  // Grosse caisse + charleston sur le groove (boucle de 2 temps)
+  function scheduleGroove() {
     if (stopped) return;
-    const t = startTime + i * interval;
-    if (t > ctx.currentTime + 0.3) { setTimeout(schedule, 80); return; }
-    hitSnare(t);
-    if (i % 16 === 0) hitKick(t);
-    i++;
-    schedule();
+    const now = ctx.currentTime;
+    // Planifie 4 temps en avance
+    for (let t = 0; t < 4; t++) {
+      const base = startTime + Math.round((now - startTime) / (beat * 2)) * (beat * 2) + t * beat;
+      if (base < now - 0.01) continue;
+      // Grosse caisse : temps 1 et 3
+      if (t % 2 === 0) hitKick(base, 0.9);
+      // Charleston tous les 8e
+      for (let e = 0; e < 2; e++) hitHat(base + e * eighth, 0.2);
+    }
+    setTimeout(scheduleGroove, 500);
   }
-  schedule();
+
+  // Roulement de caisse claire en continu (32e notes)
+  let rollI = 0;
+  function scheduleRoll() {
+    if (stopped) return;
+    const now = ctx.currentTime;
+    while (startTime + rollI * roll < now + 0.25) {
+      const t = startTime + rollI * roll;
+      if (t >= now - 0.01) hitSnare(t, 0.45);
+      rollI++;
+    }
+    setTimeout(scheduleRoll, 60);
+  }
+
+  scheduleGroove();
+  scheduleRoll();
+
+  drumLoop = { stop: () => {}, dispose: () => { stopped = true; } };
+  if (durationMs) setTimeout(() => stopAll(), durationMs);
+}
 
   drumLoop = { stop: () => {}, dispose: () => { stopped = true; } };
   if (durationMs) setTimeout(() => stopAll(), durationMs);
