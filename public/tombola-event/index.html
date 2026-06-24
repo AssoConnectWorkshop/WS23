@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tombola — Domaine de la Pierre à Sel</title>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tone@14.7.77/build/Tone.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --blue: #1E4FCC;
+  --blue-light: #4A90E2;
+  --green: #00C897;
+  --bg: #F4F6FB;
+}
+body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--bg); min-height: 100vh; color: #1a1a2e; }
+
+.screen { display: none; min-height: 100vh; }
+.screen.active { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+
+.logo {
+  width: 80px; height: 80px;
+  background: linear-gradient(135deg, var(--blue), var(--blue-light));
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 36px;
+  box-shadow: 0 6px 24px rgba(30,79,204,0.35);
+  margin-bottom: 16px; cursor: default; user-select: none;
+}
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 16px 32px; border-radius: 14px;
+  font-size: 18px; font-weight: 700;
+  border: none; cursor: pointer; transition: all 0.2s;
+}
+.btn-primary { background: var(--blue); color: white; box-shadow: 0 4px 16px rgba(30,79,204,0.3); }
+.btn-primary:hover { opacity: 0.9; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(30,79,204,0.4); }
+.btn-primary:active { transform: scale(0.97); }
+.btn-danger { background: linear-gradient(135deg, #e53e3e, #c53030); color: white; box-shadow: 0 4px 16px rgba(229,62,62,0.4); }
+.btn-danger:hover { opacity: 0.9; transform: translateY(-2px); }
+.btn-secondary { background: transparent; color: white; border: 2px solid rgba(255,255,255,0.6); }
+.btn-green { background: var(--green); color: white; }
+
+.input {
+  width: 100%; padding: 14px 16px;
+  border: 2px solid #C7D2FD; border-radius: 12px;
+  font-size: 16px; outline: none; transition: border-color 0.2s; background: white;
+  font-family: inherit;
+}
+.input:focus { border-color: var(--blue); }
+
+.card { background: white; border-radius: 20px; padding: 28px; box-shadow: 0 2px 20px rgba(0,0,0,0.07); }
+
+/* Animations */
+@keyframes countPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.12)} }
+@keyframes checkPop { 0%{transform:scale(0);opacity:0} 60%{transform:scale(1.2)} 100%{transform:scale(1);opacity:1} }
+@keyframes fadeInUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+@keyframes countdownPop { 0%{transform:scale(2.5);opacity:0} 40%{transform:scale(0.9);opacity:1} 100%{transform:scale(1);opacity:1} }
+@keyframes bounceIn { 0%{transform:translateY(-120px) scale(0.4);opacity:0} 60%{transform:translateY(10px) scale(1.1)} 100%{transform:translateY(0) scale(1);opacity:1} }
+@keyframes bgPulse { 0%,100%{background:#000} 50%{background:#1E4FCC} }
+@keyframes floatStar { from{transform:translateY(110vh) rotate(0deg);opacity:1} to{transform:translateY(-80px) rotate(720deg);opacity:0} }
+@keyframes rainDrop { from{transform:translateY(-60px) rotate(0deg)} to{transform:translateY(110vh) rotate(360deg)} }
+@keyframes frameGlow { 0%,100%{box-shadow:0 0 20px gold,0 0 50px rgba(255,215,0,0.5)} 50%{box-shadow:0 0 60px gold,0 0 120px gold,0 0 6px white} }
+@keyframes rotateBorder { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+@keyframes typeFlash { 0%,100%{opacity:1} 50%{opacity:0} }
+
+.checkmark {
+  width: 90px; height: 90px; background: var(--green);
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 44px; color: white;
+  animation: checkPop 0.6s cubic-bezier(0.175,0.885,0.32,1.275) forwards;
+  box-shadow: 0 8px 32px rgba(0,200,151,0.4);
+}
+
+/* CEREMONY */
+#screen-ceremony {
+  background: #000; color: white; padding: 0;
+  overflow: hidden; position: fixed; inset: 0; z-index: 100;
+}
+.ceremony-content {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  min-height: 100vh; padding: 40px;
+  text-align: center; position: relative; z-index: 2;
+  gap: 20px;
+}
+
+.ceremony-label {
+  font-size: clamp(14px, 2vw, 20px);
+  font-weight: 700; letter-spacing: 0.15em;
+  text-transform: uppercase; color: var(--blue-light); opacity: 0.8;
+}
+.ceremony-sublabel {
+  font-size: clamp(18px, 3vw, 28px); font-weight: 600; color: white; opacity: 0.7;
+}
+.winner-name {
+  font-size: clamp(40px, 8vw, 90px); font-weight: 900; line-height: 1.05;
+  color: white; text-shadow: 0 0 40px rgba(255,255,255,0.5);
+}
+.winner-name-epic {
+  font-size: clamp(48px, 10vw, 110px); font-weight: 900; line-height: 1;
+  color: white;
+  text-shadow: 0 0 40px #fff, 0 0 80px var(--blue-light), 0 0 120px var(--blue-light);
+}
+.lot-emoji { font-size: clamp(56px, 14vw, 130px); animation: bounceIn 0.6s cubic-bezier(0.175,0.885,0.32,1.275) forwards; }
+.countdown-num { font-size: clamp(80px, 20vw, 180px); font-weight: 900; color: #ffd700; text-shadow: 0 0 60px rgba(255,215,0,0.8); animation: countdownPop 0.5s ease forwards; }
+
+.progress-bar { width: min(360px, 80vw); height: 6px; background: rgba(255,255,255,0.15); border-radius: 3px; overflow: hidden; margin-top: 24px; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, var(--blue), var(--green)); border-radius: 3px; transition: width 0.12s linear; }
+
+.star { position: fixed; pointer-events: none; z-index: 1; animation: floatStar linear; }
+.rain-emoji { position: fixed; pointer-events: none; z-index: 3; animation: rainDrop linear; }
+
+.chat-frame-wrap {
+  position: relative; display: inline-block;
+  border: 5px solid #ffd700; border-radius: 14px;
+  animation: frameGlow 2s ease infinite;
+  overflow: hidden; max-width: min(280px, 80vw);
+}
+.chat-frame-wrap img { width: 100%; display: block; }
+.chat-placeholder { padding: 50px 40px; font-size: 70px; text-align: center; background: #1a1a2e; }
+
+/* ADMIN */
+.participants-list { max-height: 280px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 12px; background: var(--bg); }
+.participant-item { padding: 10px 16px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; font-size: 14px; }
+.participant-item:last-child { border-bottom: none; }
+.lot-row { padding: 10px 14px; background: var(--bg); border-radius: 10px; font-size: 14px; display: flex; align-items: center; gap: 10px; }
+
+/* RESULTS */
+#screen-results { background: var(--blue); color: white; }
+.result-card { background: rgba(255,255,255,0.12); border-radius: 16px; padding: 18px 22px; display: flex; align-items: center; gap: 18px; text-align: left; backdrop-filter: blur(4px); }
+</style>
+</head>
+<body>
+
+<!-- ========== HOME ========== -->
+<div id="screen-home" class="screen active" style="padding: 40px; text-align: center; gap: 24px;">
+  <div class="logo" id="logo-click">🏠</div>
+  <h1 style="font-size: clamp(22px, 4vw, 36px); font-weight: 800; color: var(--blue); line-height: 1.25; max-width: 340px;">
+    Tombola du Domaine<br>de la Pierre à Sel
+  </h1>
+  <p style="font-size: 18px; color: var(--blue-light); font-weight: 500;">
+    Scannez votre QR code pour participer !
+  </p>
+  <div id="qrcode-home" style="background: white; padding: 16px; border-radius: 18px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); display: inline-block;"></div>
+  <button class="btn btn-primary" onclick="showScreen('register')" style="font-size: 20px; padding: 20px 52px; margin-top: 4px;">
+    🎟️ Je participe
+  </button>
+  <div style="margin-top: 8px; animation: fadeInUp 0.5s ease;">
+    <div id="counter-number" style="font-size: 52px; font-weight: 900; color: var(--blue); line-height: 1;">0</div>
+    <div style="font-size: 15px; color: #888; margin-top: 4px;">participant(s) inscrit(s)</div>
+  </div>
+</div>
+
+<!-- ========== REGISTER ========== -->
+<div id="screen-register" class="screen" style="padding: 24px;">
+  <div class="card" style="width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 24px;">
+    <div style="text-align: center;">
+      <div class="logo" style="margin: 0 auto 16px;">🏠</div>
+      <h2 style="font-size: 24px; font-weight: 800; color: var(--blue);">Inscription Tombola</h2>
+      <p style="color: #888; margin-top: 6px; font-size: 15px;">Domaine de la Pierre à Sel</p>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+      <div>
+        <label style="font-size: 14px; font-weight: 600; color: #444; display: block; margin-bottom: 6px;">Prénom *</label>
+        <input class="input" id="input-prenom" type="text" placeholder="Jean" autocomplete="given-name">
+      </div>
+      <div>
+        <label style="font-size: 14px; font-weight: 600; color: #444; display: block; margin-bottom: 6px;">Nom *</label>
+        <input class="input" id="input-nom" type="text" placeholder="Dupont" autocomplete="family-name">
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="register()" style="width: 100%; font-size: 17px;">
+      M'inscrire à la tombola 🎉
+    </button>
+    <p id="register-error" style="color: #e53e3e; font-size: 14px; text-align: center; min-height: 20px;"></p>
+  </div>
+</div>
+
+<!-- ========== CONFIRM ========== -->
+<div id="screen-confirm" class="screen" style="padding: 40px; text-align: center; gap: 20px;">
+  <div class="checkmark">✓</div>
+  <h2 style="font-size: 30px; font-weight: 800; color: var(--blue); animation: fadeInUp 0.5s ease 0.3s both;">Vous êtes inscrit(e) !</h2>
+  <p id="confirm-name" style="font-size: 24px; font-weight: 700; color: var(--blue-light); animation: fadeInUp 0.5s ease 0.5s both;"></p>
+  <p style="color: #666; font-size: 16px; animation: fadeInUp 0.5s ease 0.7s both;">Bonne chance 🎉 Rendez-vous pour le tirage !</p>
+</div>
+
+<!-- ========== ADMIN ========== -->
+<div id="screen-admin" class="screen" style="background: var(--bg); align-items: stretch; justify-content: flex-start; overflow-y: auto; padding: 0;">
+  <div style="max-width: 600px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; padding: 28px 20px;">
+
+    <div style="display: flex; align-items: center; justify-content: space-between;">
+      <h1 style="font-size: 22px; font-weight: 800; color: var(--blue);">⚙️ Admin — Tombola</h1>
+      <button onclick="showScreen('home')" style="background: none; border: none; cursor: pointer; color: #888; font-size: 14px;">← Accueil</button>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+      <div class="card" style="text-align: center; padding: 20px;">
+        <div id="admin-count" style="font-size: 42px; font-weight: 900; color: var(--blue);">0</div>
+        <div style="color: #888; font-size: 13px; margin-top: 4px;">participants</div>
+      </div>
+      <div class="card" style="text-align: center; padding: 20px;">
+        <div style="font-size: 42px; font-weight: 900; color: var(--green);">4</div>
+        <div style="color: #888; font-size: 13px; margin-top: 4px;">lots</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="font-weight: 700; color: var(--blue); margin-bottom: 14px;">🎁 Lots à gagner</h3>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div class="lot-row">🥇 <strong>1er prix</strong> — Une glace 🍦</div>
+        <div class="lot-row">🥈 <strong>2e prix</strong> — Une corbeille de fruits 🍎</div>
+        <div class="lot-row">🥉 <strong>3e prix</strong> — Un shot de génépi 🥃</div>
+        <div class="lot-row">🐱 <strong>Lot bonus</strong> — Photo du chat encadrée</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+        <h3 style="font-weight: 700; color: var(--blue);">👥 Participants inscrits</h3>
+        <button onclick="clearParticipants()" style="background: none; border: none; color: #e53e3e; font-size: 13px; cursor: pointer; text-decoration: underline;">Tout effacer</button>
+      </div>
+      <div class="participants-list" id="admin-list">
+        <div style="padding: 20px; text-align: center; color: #aaa; font-size: 14px;">Aucun inscrit pour le moment</div>
+      </div>
+    </div>
+
+    <div class="card" style="text-align: center;">
+      <h3 style="font-weight: 700; color: var(--blue); margin-bottom: 14px;">QR Code d'inscription</h3>
+      <div id="admin-qr" style="display: inline-block; background: white; padding: 12px; border-radius: 12px; border: 1px solid #e2e8f0;"></div>
+      <p style="color: #aaa; font-size: 13px; margin-top: 10px;">À imprimer et afficher</p>
+    </div>
+
+    <button id="btn-launch" class="btn btn-danger" onclick="launchCeremony()" style="font-size: 20px; padding: 26px; border-radius: 16px; letter-spacing: 0.05em; width: 100%;">
+      🎆 LANCER LE TIRAGE AU SORT
+    </button>
+    <p id="launch-error" style="color: #e53e3e; text-align: center; font-size: 14px; min-height: 20px;"></p>
+  </div>
+</div>
+
+<!-- ========== CEREMONY ========== -->
+<div id="screen-ceremony" class="screen" style="display:none; position:fixed; inset:0; background:#000; z-index:100;">
+  <div class="ceremony-content" id="ceremony-content"></div>
+</div>
+
+<!-- ========== RESULTS ========== -->
+<div id="screen-results" class="screen" style="background: var(--blue); color: white; padding: 40px; overflow-y: auto; justify-content: flex-start; align-items: stretch;">
+  <div style="max-width: 500px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; padding: 20px 0;">
+    <div style="text-align: center;">
+      <div style="font-size: 56px;">🏆</div>
+      <h1 style="font-size: 32px; font-weight: 900; margin-top: 8px;">Résultats du Tirage</h1>
+      <p style="opacity: 0.7; margin-top: 6px;">Domaine de la Pierre à Sel</p>
+    </div>
+    <div id="results-list" style="display: flex; flex-direction: column; gap: 12px;"></div>
+    <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 12px;">
+      <button class="btn btn-secondary" onclick="restartAdmin()">Retour admin</button>
+      <button class="btn btn-green" onclick="exportResults()">Exporter</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// STORAGE
+// ============================================================
+const KEY = 'tombola_participants_psel';
+function getP() { try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; } }
+function saveP(list) { localStorage.setItem(KEY, JSON.stringify(list)); }
+function addP(prenom, nom) {
+  const list = getP();
+  list.push({ id: Date.now(), prenom, nom, ts: new Date().toISOString() });
+  saveP(list);
+  updateCounter();
+}
+function clearParticipants() {
+  if (!confirm('Effacer tous les participants ?')) return;
+  localStorage.removeItem(KEY);
+  updateCounter(); renderAdminList();
+}
+
+let winners = {};
+
+// ============================================================
+// SCREENS
+// ============================================================
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => { s.classList.remove('active'); s.style.display = 'none'; });
+  const s = document.getElementById('screen-' + id);
+  s.style.display = 'flex';
+  requestAnimationFrame(() => s.classList.add('active'));
+  if (id === 'admin') renderAdmin();
+  if (id === 'home') { updateCounter(); generateQR('qrcode-home'); }
+}
+
+function restartAdmin() { winners = {}; showScreen('admin'); }
+
+// ============================================================
+// QR CODE
+// ============================================================
+function generateQR(elId) {
+  const url = window.location.href.split('?')[0].split('#')[0] + '?participant=true';
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.innerHTML = '';
+  QRCode.toCanvas(url, { width: 180, margin: 1, color: { dark: '#1E4FCC', light: '#FFFFFF' } }, (err, canvas) => {
+    if (!err) el.appendChild(canvas);
+  });
+}
+
+// ============================================================
+// COUNTER
+// ============================================================
+function updateCounter() {
+  const n = getP().length;
+  const el = document.getElementById('counter-number');
+  if (el) { el.textContent = n; el.style.animation = 'none'; el.offsetHeight; el.style.animation = 'countPulse 0.4s ease'; }
+  const ac = document.getElementById('admin-count');
+  if (ac) ac.textContent = n;
+}
+
+// ============================================================
+// REGISTER
+// ============================================================
+function register() {
+  const prenom = document.getElementById('input-prenom').value.trim();
+  const nom = document.getElementById('input-nom').value.trim();
+  const err = document.getElementById('register-error');
+  if (!prenom || !nom) { err.textContent = 'Veuillez remplir prénom et nom.'; return; }
+  err.textContent = '';
+  addP(prenom, nom);
+  document.getElementById('confirm-name').textContent = prenom + ' ' + nom;
+  document.getElementById('input-prenom').value = '';
+  document.getElementById('input-nom').value = '';
+  showScreen('confirm');
+}
+
+// ============================================================
+// ADMIN
+// ============================================================
+function renderAdmin() { updateCounter(); renderAdminList(); generateQR('admin-qr'); }
+function renderAdminList() {
+  const list = getP();
+  const el = document.getElementById('admin-list');
+  if (!el) return;
+  if (!list.length) { el.innerHTML = '<div style="padding:20px;text-align:center;color:#aaa;font-size:14px;">Aucun inscrit pour le moment</div>'; return; }
+  el.innerHTML = list.map((p, i) =>
+    `<div class="participant-item"><span><b>${i+1}.</b> ${p.prenom} ${p.nom}</span><span style="color:#bbb;font-size:12px;">${new Date(p.ts).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</span></div>`
+  ).join('');
+}
+
+// ============================================================
+// EXPORT
+// ============================================================
+function exportResults() {
+  const lines = [
+    'Tombola — Domaine de la Pierre à Sel', '', new Date().toLocaleDateString('fr-FR'), '',
+    '🥇 1er prix (Glace) : ' + (winners.lot1 ? winners.lot1.prenom + ' ' + winners.lot1.nom : '-'),
+    '🥈 2e prix (Fruits) : ' + (winners.lot2 ? winners.lot2.prenom + ' ' + winners.lot2.nom : '-'),
+    '🥉 3e prix (Génépi) : ' + (winners.lot3 ? winners.lot3.prenom + ' ' + winners.lot3.nom : '-'),
+    '🐱 Lot bonus (Chat) : ' + (winners.bonus ? winners.bonus.prenom + ' ' + winners.bonus.nom : '-'),
+  ];
+  const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'resultats-tombola.txt';
+  a.click();
+}
+
+// ============================================================
+// SOUND ENGINE (Tone.js)
+// ============================================================
+let activeNodes = [];
+let drumLoop = null;
+let drumTransportStarted = false;
+
+async function startAudio() {
+  if (Tone.context.state !== 'running') await Tone.start();
+}
+
+function stopAll() {
+  if (drumLoop) { try { drumLoop.stop(0); drumLoop.dispose(); } catch {} drumLoop = null; }
+  activeNodes.forEach(n => { try { n.stop(0); n.dispose(); } catch {} });
+  activeNodes = [];
+  try { Tone.Transport.stop(); Tone.Transport.cancel(); } catch {}
+}
+
+function playDrumroll(durationMs) {
+  stopAll();
+  const noise = new Tone.NoiseSynth({
+    noise: { type: 'brown' },
+    envelope: { attack: 0.001, decay: 0.06, sustain: 0.2, release: 0.05 },
+    volume: -6
+  }).toDestination();
+  activeNodes.push(noise);
+  const loop = new Tone.Loop(time => { noise.triggerAttackRelease('32n', time); }, '32n');
+  loop.start(0);
+  Tone.Transport.start();
+  drumLoop = loop;
+  if (durationMs) setTimeout(() => stopAll(), durationMs);
+}
+
+function playFanfare(level) {
+  const poly = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: 'triangle8' },
+    envelope: { attack: 0.04, decay: 0.4, sustain: 0.5, release: 1.2 },
+    volume: -5
+  }).toDestination();
+  activeNodes.push(poly);
+  const t = Tone.now();
+  if (level === 1) {
+    poly.triggerAttackRelease(['C4','E4','G4'], '8n', t);
+    poly.triggerAttackRelease(['E4','G4','B4'], '4n', t + 0.3);
+  } else if (level === 2) {
+    poly.triggerAttackRelease(['C4','E4','G4'], '8n', t);
+    poly.triggerAttackRelease(['F4','A4','C5'], '8n', t + 0.25);
+    poly.triggerAttackRelease(['G4','B4','D5'], '8n', t + 0.5);
+    poly.triggerAttackRelease(['C5','E5','G5'], '4n', t + 0.8);
+  } else {
+    poly.triggerAttackRelease(['C4','E4','G4','C5'], '8n', t);
+    poly.triggerAttackRelease(['F4','A4','C5','F5'], '8n', t + 0.28);
+    poly.triggerAttackRelease(['G4','B4','D5','G5'], '8n', t + 0.56);
+    poly.triggerAttackRelease(['C4','E4','G4','C5','E5'], '2n', t + 0.9);
+    poly.triggerAttackRelease(['C3','G3','C4','E4','G4','C5','E5','G5'], '1m', t + 1.8);
+  }
+}
+
+function playBeep() {
+  const s = new Tone.Synth({ oscillator:{type:'sine'}, envelope:{attack:0.01,decay:0.15,sustain:0,release:0.1}, volume:-4 }).toDestination();
+  activeNodes.push(s);
+  const t = Tone.now();
+  s.triggerAttackRelease('A4','16n', t);
+}
+
+// ============================================================
+// CEREMONY HELPERS
+// ============================================================
+const cc = () => document.getElementById('ceremony-content');
+function setCeremony(html) { const el = cc(); if (el) el.innerHTML = html; }
+function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function flashScreen(color='rgba(255,255,255,0.9)', ms=250) {
+  const el = document.createElement('div');
+  el.style.cssText = `position:fixed;inset:0;background:${color};z-index:9999;pointer-events:none;transition:opacity ${ms}ms ease;`;
+  document.body.appendChild(el);
+  setTimeout(() => { el.style.opacity='0'; setTimeout(()=>el.remove(), ms); }, 60);
+}
+
+function typewriter(elId, text, speed=80) {
+  return new Promise(res => {
+    const el = document.getElementById(elId);
+    if (!el) return res();
+    let i = 0; el.textContent = '';
+    const iv = setInterval(() => {
+      if (i < text.length) { el.textContent += text[i++]; }
+      else { clearInterval(iv); res(); }
+    }, speed);
+  });
+}
+
+async function showCountdown(color='#ffd700') {
+  for (const n of [3,2,1]) {
+    setCeremony(`<div class="countdown-num" style="color:${color};">${n}</div>`);
+    playBeep();
+    await wait(950);
+  }
+}
+
+function fireConfetti(level) {
+  const c1 = ['#1E4FCC','#4A90E2','#00C897','#ffffff'];
+  const c2 = [...c1, '#ffd700','#ff6b6b','#ff9f43'];
+  if (level === 1) {
+    confetti({ particleCount: 90, spread: 70, colors: c1, origin: {y:0.6} });
+  } else if (level === 2) {
+    confetti({ particleCount: 160, spread: 90, colors: c1, origin: {y:0.5} });
+    setTimeout(() => confetti({ particleCount: 80, angle:60, spread:55, origin:{x:0}, colors:c1 }), 350);
+    setTimeout(() => confetti({ particleCount: 80, angle:120, spread:55, origin:{x:1}, colors:c1 }), 350);
+  } else {
+    const shoot = (origin, angle) => confetti({ particleCount:220, angle, spread:100, colors:c2, origin, startVelocity:65, gravity:0.9 });
+    shoot({x:0.5,y:0.5}, 90);
+    setTimeout(() => { shoot({x:0,y:0.7},60); shoot({x:1,y:0.7},120); }, 300);
+    setTimeout(() => { shoot({x:0.2,y:1},75); shoot({x:0.8,y:1},105); }, 600);
+    setTimeout(() => {
+      confetti({ particleCount:120, spread:360, gravity:0.4, scalar:1.6, colors:['#ffd700','#ffa500','#ffec00'], shapes:['star'], origin:{y:0.3} });
+    }, 900);
+    setTimeout(() => shoot({x:0.5,y:1},90), 1200);
+  }
+}
+
+let starInterval = null;
+function startStars() {
+  const emojis = ['⭐','✨','💫','🌟','✦'];
+  const el = document.getElementById('screen-ceremony');
+  starInterval = setInterval(() => {
+    const s = document.createElement('div');
+    s.className = 'star';
+    s.textContent = emojis[Math.floor(Math.random()*emojis.length)];
+    s.style.left = Math.random()*100 + 'vw';
+    s.style.bottom = '-40px';
+    s.style.fontSize = (14+Math.random()*18)+'px';
+    s.style.animationDuration = (4+Math.random()*4)+'s';
+    s.style.animationDelay = '0s';
+    el.appendChild(s);
+    setTimeout(() => s.remove(), 9000);
+  }, 280);
+}
+function stopStars() { if (starInterval) { clearInterval(starInterval); starInterval = null; } }
+
+function rainEmojis(list, count, totalMs) {
+  const el = document.getElementById('screen-ceremony');
+  for (let i=0; i<count; i++) {
+    setTimeout(() => {
+      const d = document.createElement('div');
+      d.className = 'rain-emoji';
+      d.textContent = list[Math.floor(Math.random()*list.length)];
+      d.style.left = Math.random()*95+'vw';
+      d.style.top = '-60px';
+      d.style.fontSize = (22+Math.random()*28)+'px';
+      d.style.animationDuration = (1.4+Math.random()*2)+'s';
+      el.appendChild(d);
+      setTimeout(() => d.remove(), 5000);
+    }, Math.random()*totalMs);
+  }
+}
+
+// ============================================================
+// CEREMONY PHASES
+// ============================================================
+async function launchCeremony() {
+  const list = getP();
+  const errEl = document.getElementById('launch-error');
+  if (list.length < 3) { errEl.textContent = 'Il faut au moins 3 participants.'; return; }
+  errEl.textContent = '';
+  await startAudio();
+
+  // Draw without duplicates for main lots
+  const pool = [...list];
+  const pick = () => { const i=Math.floor(Math.random()*pool.length); return pool.splice(i,1)[0]; };
+  winners.lot3 = pick();
+  winners.lot2 = pick();
+  winners.lot1 = pick();
+  // Bonus: from all participants (can overlap)
+  winners.bonus = list[Math.floor(Math.random()*list.length)];
+
+  // Show ceremony screen
+  const cer = document.getElementById('screen-ceremony');
+  document.querySelectorAll('.screen').forEach(s => { s.classList.remove('active'); s.style.display='none'; });
+  cer.style.display = 'flex';
+  cer.classList.add('active');
+
+  await phase1();
+  await phase2();
+  await phase3();
+  await phase4();
+  await phase5();
+  phase6();
+}
+
+// PHASE 1 — Suspense
+async function phase1() {
+  const cer = document.getElementById('screen-ceremony');
+  cer.style.background = '#000';
+  setCeremony(`
+    <div class="ceremony-label">Préparez-vous...</div>
+    <div class="ceremony-text" id="tw" style="font-size:clamp(24px,5vw,48px);font-weight:700;color:#4A90E2;min-height:60px;"></div>
+    <div class="progress-bar"><div class="progress-fill" id="prog" style="width:0%"></div></div>
+  `);
+  startStars();
+  playDrumroll();
+  let p = 0;
+  const pi = setInterval(() => { p=Math.min(100,p+2); const el=document.getElementById('prog'); if(el) el.style.width=p+'%'; }, 100);
+  await typewriter('tw', 'Le grand tirage commence...', 90);
+  await wait(2500);
+  clearInterval(pi);
+  stopAll();
+  stopStars();
+  // Clean up star elements
+  document.querySelectorAll('.star').forEach(s=>s.remove());
+}
+
+// PHASE 2 — 3e prix : Shot de Génépi
+async function phase2() {
+  const cer = document.getElementById('screen-ceremony');
+  cer.style.background = '#050510';
+  setCeremony(`
+    <div class="ceremony-label">3e prix</div>
+    <div class="ceremony-sublabel">Un shot de génépi 🥃</div>
+  `);
+  playDrumroll(3200);
+  await wait(3200);
+  stopAll();
+  await showCountdown();
+  flashScreen();
+  await wait(200);
+  playFanfare(1);
+  setCeremony(`
+    <div class="lot-emoji">🥃</div>
+    <div class="ceremony-label" style="color:#4A90E2;">3e prix — Shot de Génépi</div>
+    <div class="winner-name">${winners.lot3.prenom}<br>${winners.lot3.nom}</div>
+  `);
+  fireConfetti(1);
+  await wait(4500);
+  stopAll();
+}
+
+// PHASE 3 — 2e prix : Corbeille de fruits
+async function phase3() {
+  const cer = document.getElementById('screen-ceremony');
+  cer.style.background = '#050510';
+  setCeremony(`
+    <div class="ceremony-label">2e prix</div>
+    <div class="ceremony-sublabel">Une corbeille de fruits 🍎</div>
+  `);
+  playDrumroll(3200);
+  await wait(3200);
+  stopAll();
+  await showCountdown('#ff9f43');
+  flashScreen('rgba(255,159,67,0.6)', 300);
+  await wait(200);
+  playFanfare(2);
+  setCeremony(`
+    <div class="lot-emoji">🍎</div>
+    <div class="ceremony-label" style="color:#ff9f43;">2e prix — Corbeille de Fruits</div>
+    <div class="winner-name" style="font-size:clamp(50px,11vw,110px);">${winners.lot2.prenom}<br>${winners.lot2.nom}</div>
+  `);
+  fireConfetti(2);
+  rainEmojis(['🍎','🍊','🍇','🍌','🍓','🍑'], 30, 3000);
+  await wait(5500);
+  stopAll();
+}
+
+// PHASE 4 — 1er prix : GLACE
+async function phase4() {
+  const cer = document.getElementById('screen-ceremony');
+  cer.style.background = '#000';
+  setCeremony(`<div class="ceremony-label" style="letter-spacing:0.4em;font-size:clamp(12px,2vw,18px);opacity:0.5;">LE GRAND LOT</div>`);
+  await wait(5000); // Maximum silence & suspense
+  stopAll();
+  await startAudio();
+  playFanfare(3);
+  for (const n of [3,2,1]) {
+    setCeremony(`<div class="countdown-num" style="color:#ffd700;animation:countdownPop 0.5s ease;">${n}</div>`);
+    flashScreen('rgba(30,79,204,0.25)', 180);
+    await wait(900);
+  }
+  flashScreen('rgba(255,255,255,0.95)', 600);
+  await wait(300);
+  cer.style.animation = 'bgPulse 0.9s ease infinite';
+  setCeremony(`
+    <div style="color:#ffd700;font-weight:800;font-size:clamp(14px,2.5vw,22px);letter-spacing:0.2em;text-transform:uppercase;">🏆 1er prix — Une Glace 🍦</div>
+    <div class="winner-name-epic" id="epic-name"></div>
+  `);
+  await typewriter('epic-name', winners.lot1.prenom + ' ' + winners.lot1.nom, 55);
+  fireConfetti(3);
+  rainEmojis(['🍦','🎉','🏆','⭐','🌟','✨','🎊','🥳'], 50, 7000);
+  await wait(10000);
+  stopAll();
+  cer.style.animation = '';
+  cer.style.background = '#000';
+}
+
+// PHASE 5 — Lot bonus : Photo du chat
+async function phase5() {
+  const cer = document.getElementById('screen-ceremony');
+  cer.style.background = '#0e0e1a';
+  cer.style.animation = '';
+
+  setCeremony(`
+    <div style="display:flex;flex-direction:column;align-items:center;gap:18px;max-width:380px;width:100%;">
+      <div style="color:#ffd700;font-size:clamp(13px,2vw,18px);font-weight:800;letter-spacing:0.2em;text-transform:uppercase;">✨ Lot Bonus ✨</div>
+      <div class="chat-frame-wrap">
+        <img src="chat.jpg" alt="Chat du Domaine" onerror="this.outerHTML='<div class=\\'chat-placeholder\\'>🐱</div>'">
+      </div>
+      <div style="color:rgba(255,255,255,0.75);font-size:15px;text-align:center;">Tableau encadré du Domaine de la Pierre à Sel</div>
+      <div style="font-size:clamp(22px,4vw,32px);font-weight:900;color:white;">${winners.bonus.prenom} ${winners.bonus.nom}</div>
+    </div>
+  `);
+
+  confetti({ particleCount:70, spread:80, colors:['#ffd700','#ffa500','#fff8dc','#ffec00'], shapes:['star'], gravity:0.5, origin:{y:0.4} });
+  await wait(7000);
+}
+
+// PHASE 6 — Results
+function phase6() {
+  const lots = [
+    { emoji:'🥇', label:'1er prix — Une Glace 🍦', w:winners.lot1 },
+    { emoji:'🥈', label:'2e prix — Corbeille de Fruits 🍎', w:winners.lot2 },
+    { emoji:'🥉', label:'3e prix — Shot de Génépi 🥃', w:winners.lot3 },
+    { emoji:'🐱', label:'Lot Bonus — Photo du Chat', w:winners.bonus },
+  ];
+  document.getElementById('results-list').innerHTML = lots.map(l => `
+    <div class="result-card">
+      <span style="font-size:36px;">${l.emoji}</span>
+      <div>
+        <div style="font-size:12px;opacity:0.65;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px;">${l.label}</div>
+        <div style="font-size:22px;font-weight:800;">${l.w.prenom} ${l.w.nom}</div>
+      </div>
+    </div>
+  `).join('');
+
+  showScreen('results');
+
+  // Background fireworks loop
+  let shot = 0;
+  const iv = setInterval(() => {
+    confetti({ particleCount:35, spread:55, colors:['#4A90E2','#00C897','#ffd700','#fff'], origin:{x:Math.random(),y:Math.random()*0.5} });
+    if (++shot >= 12) clearInterval(iv);
+  }, 1400);
+}
+
+// ============================================================
+// INIT
+// ============================================================
+window.addEventListener('DOMContentLoaded', () => {
+  updateCounter();
+  if (typeof QRCode !== 'undefined') generateQR('qrcode-home');
+
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('participant') === 'true') showScreen('register');
+  if (window.location.hash === '#admin') showScreen('admin');
+
+  // Secret: 5 taps on logo → admin
+  let taps = 0;
+  document.getElementById('logo-click').addEventListener('click', () => {
+    if (++taps >= 5) { taps = 0; showScreen('admin'); }
+  });
+
+  // Enter key on form
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && document.getElementById('screen-register').classList.contains('active')) register();
+  });
+});
+</script>
+</body>
+</html>
