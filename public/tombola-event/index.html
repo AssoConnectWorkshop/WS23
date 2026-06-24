@@ -221,7 +221,10 @@ body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background
 
     <div style="display: flex; align-items: center; justify-content: space-between;">
       <h1 style="font-size: 22px; font-weight: 800; color: var(--blue);">⚙️ Admin — Tombola</h1>
-      <button onclick="showScreen('home')" style="background: none; border: none; cursor: pointer; color: #888; font-size: 14px;">← Accueil</button>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <button onclick="renderAdmin()" style="background:var(--blue);color:white;border:none;border-radius:8px;padding:6px 14px;font-size:13px;cursor:pointer;font-weight:600;">⟳ Rafraîchir</button>
+        <button onclick="showScreen('home')" style="background: none; border: none; cursor: pointer; color: #888; font-size: 14px;">← Accueil</button>
+      </div>
     </div>
 
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
@@ -326,7 +329,7 @@ function showScreen(id) {
   const s = document.getElementById('screen-' + id);
   s.style.display = 'flex';
   requestAnimationFrame(() => s.classList.add('active'));
-  if (id === 'admin') renderAdmin();
+  if (id === 'admin') renderAdmin(); // async, intentionally not awaited — updates DOM when ready
   if (id === 'home') { updateCounter(); generateQR('qrcode-home'); }
 }
 
@@ -409,12 +412,19 @@ async function updateWaitingCount() {
 // ============================================================
 // ADMIN
 // ============================================================
-async function renderAdmin() { await updateCounter(); renderAdminList(); generateQR('admin-qr'); }
+async function renderAdmin() {
+  const el = document.getElementById('admin-list');
+  if (el) el.innerHTML = '<div style="padding:20px;text-align:center;color:#aaa;font-size:14px;">Chargement…</div>';
+  await fetchParticipants();
+  updateCounterFromCache();
+  renderAdminList();
+  generateQR('admin-qr');
+}
 function renderAdminList() {
   const list = cachedParticipants;
   const el = document.getElementById('admin-list');
   if (!el) return;
-  if (!list.length) { el.innerHTML = '<div style="padding:20px;text-align:center;color:#aaa;font-size:14px;">Aucun inscrit pour le moment</div>'; return; }
+  if (!Array.isArray(list) || !list.length) { el.innerHTML = '<div style="padding:20px;text-align:center;color:#aaa;font-size:14px;">Aucun inscrit pour le moment</div>'; return; }
   el.innerHTML = list.map((p, i) =>
     `<div class="participant-item"><span><b>${i+1}.</b> ${p.prenom} ${p.nom}</span><span style="color:#bbb;font-size:12px;">${new Date(p.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</span></div>`
   ).join('');
