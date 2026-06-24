@@ -465,30 +465,58 @@ function stopAll() {
   try { Tone.Transport.stop(); Tone.Transport.cancel(); } catch {}
 }
 
-// Real snare drum roll
+// Snare drum roll — double-stroke roll, 32nd notes at 120 BPM (~32 hits/sec)
 function playDrumroll(durationMs) {
   stopAll();
-  const snare = new Tone.NoiseSynth({
-    noise: { type: 'white' },
-    envelope: { attack: 0.001, decay: 0.07, sustain: 0, release: 0.04 },
-    volume: -7
-  }).toDestination();
-  const kick = new Tone.MembraneSynth({
-    pitchDecay: 0.05, octaves: 5,
-    envelope: { attack: 0.001, decay: 0.18, sustain: 0, release: 0.1 },
-    volume: -4
-  }).toDestination();
-  activeNodes.push(snare, kick);
-  Tone.Transport.bpm.value = 160;
-  let beat = 0;
-  const loop = new Tone.Loop(time => {
-    snare.triggerAttackRelease('16n', time);
-    if (beat % 16 === 0 || beat % 16 === 8) kick.triggerAttackRelease('C1', '8n', time);
-    beat++;
-  }, '16n');
-  loop.start(0);
-  Tone.Transport.start();
-  drumLoop = loop;
+  const ctx = Tone.context.rawContext;
+
+  function hitSnare(when) {
+    // White noise burst through a bandpass filter — classic snare character
+    const buf = ctx.createBuffer(1, ctx.sampleRate * 0.12, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const filt = ctx.createBiquadFilter();
+    filt.type = 'bandpass';
+    filt.frequency.value = 2200;
+    filt.Q.value = 0.8;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.55, when);
+    g.gain.exponentialRampToValueAtTime(0.001, when + 0.11);
+    src.connect(filt); filt.connect(g); g.connect(ctx.destination);
+    src.start(when); src.stop(when + 0.13);
+  }
+
+  function hitKick(when) {
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(150, when);
+    osc.frequency.exponentialRampToValueAtTime(40, when + 0.12);
+    g.gain.setValueAtTime(0.8, when);
+    g.gain.exponentialRampToValueAtTime(0.001, when + 0.18);
+    osc.connect(g); g.connect(ctx.destination);
+    osc.start(when); osc.stop(when + 0.2);
+  }
+
+  const interval = 60 / 120 / 8; // 32nd note at 120 BPM ≈ 0.0625s
+  const startTime = ctx.currentTime + 0.05;
+  let i = 0;
+  let stopped = false;
+
+  function schedule() {
+    if (stopped) return;
+    const t = startTime + i * interval;
+    if (t > ctx.currentTime + 0.3) { setTimeout(schedule, 80); return; }
+    hitSnare(t);
+    if (i % 16 === 0) hitKick(t);
+    i++;
+    schedule();
+  }
+  schedule();
+
+  drumLoop = { stop: () => {}, dispose: () => { stopped = true; } };
   if (durationMs) setTimeout(() => stopAll(), durationMs);
 }
 
@@ -517,42 +545,83 @@ function playFanfare(level) {
   }
 }
 
-// Mario Kart-style countdown beep (square wave, short decay)
+// Mario Kart countdown: clean sine "ding" for 3-2-1, bright chord for GO
 function playCountdownBeep(isGo) {
-  const s = new Tone.Synth({
-    oscillator: { type: 'square' },
-    envelope: { attack: 0.001, decay: 0.06, sustain: 0.15, release: 0.18 },
-    volume: -8
-  }).toDestination();
-  activeNodes.push(s);
-  const t = Tone.now();
-  s.triggerAttackRelease(isGo ? 'B5' : 'B4', isGo ? '8n' : '16n', t);
+  const ctx = Tone.context.rawContext;
+  const now = ctx.currentTime;
+
+  function sinePing(freq, startTime, duration, volume) {
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    g.gain.setValueAtTime(0, startTime);
+    g.gain.linearRampToValueAtTime(volume, startTime + 0.008);
+    g.gain.setValueAtTime(volume, startTime + 0.05);
+    g.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+    osc.connect(g); g.connect(ctx.destination);
+    osc.start(startTime); osc.stop(startTime + duration + 0.02);
+  }
+
+  if (isGo) {
+    // GO! : two quick rising pings — celebratory
+    sinePing(1318, now, 0.55, 0.5);       // E6
+    sinePing(1568, now + 0.06, 0.5, 0.4); // G6
+    sinePing(2093, now + 0.12, 0.6, 0.45); // C7
+  } else {
+    // 3-2-1: short clean ding at 880 Hz (A5) — identical each time, like MK
+    sinePing(880, now, 0.32, 0.5);
+    // Subtle overtone for warmth
+    sinePing(1760, now, 0.18, 0.12);
+  }
 }
 
-// Cat meow using raw Web Audio API frequency sweep
+// Cat meow — sawtooth + formant filter sweep, like a real "miaou"
 function playCatMeow() {
   const ctx = Tone.context.rawContext;
   const now = ctx.currentTime;
+
+  // Fundamental oscillator (sawtooth = rich harmonics like a voice)
   const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  const filt = ctx.createBiquadFilter();
-  filt.type = 'bandpass';
-  filt.frequency.value = 1100;
-  filt.Q.value = 4;
   osc.type = 'sawtooth';
-  osc.frequency.setValueAtTime(420, now);
-  osc.frequency.linearRampToValueAtTime(860, now + 0.18);
-  osc.frequency.linearRampToValueAtTime(620, now + 0.45);
-  osc.frequency.linearRampToValueAtTime(480, now + 0.65);
-  gain.gain.setValueAtTime(0, now);
-  gain.gain.linearRampToValueAtTime(0.38, now + 0.07);
-  gain.gain.setValueAtTime(0.38, now + 0.4);
-  gain.gain.linearRampToValueAtTime(0, now + 0.72);
-  osc.connect(filt);
-  filt.connect(gain);
-  gain.connect(ctx.destination);
-  osc.start(now);
-  osc.stop(now + 0.8);
+  // Pitch: starts mid, rises then falls — "mia-ou"
+  osc.frequency.setValueAtTime(380, now);
+  osc.frequency.linearRampToValueAtTime(720, now + 0.22);
+  osc.frequency.linearRampToValueAtTime(500, now + 0.55);
+  osc.frequency.linearRampToValueAtTime(350, now + 0.85);
+
+  // Formant filter mimics the vowel shape of a meow
+  const formant = ctx.createBiquadFilter();
+  formant.type = 'bandpass';
+  formant.Q.value = 5;
+  formant.frequency.setValueAtTime(800, now);       // "miii"
+  formant.frequency.linearRampToValueAtTime(1400, now + 0.22); // peak
+  formant.frequency.linearRampToValueAtTime(700, now + 0.65);  // "aou"
+  formant.frequency.linearRampToValueAtTime(500, now + 0.85);
+
+  // Vibrato LFO for that cat wobble at the end
+  const vibrato = ctx.createOscillator();
+  vibrato.type = 'sine';
+  vibrato.frequency.value = 6; // 6 Hz vibrato
+  const vibratoGain = ctx.createGain();
+  vibratoGain.gain.setValueAtTime(0, now + 0.4);
+  vibratoGain.gain.linearRampToValueAtTime(18, now + 0.65);
+  vibrato.connect(vibratoGain);
+  vibratoGain.connect(osc.frequency);
+
+  // Amplitude envelope
+  const masterGain = ctx.createGain();
+  masterGain.gain.setValueAtTime(0, now);
+  masterGain.gain.linearRampToValueAtTime(0.5, now + 0.06);
+  masterGain.gain.setValueAtTime(0.5, now + 0.55);
+  masterGain.gain.linearRampToValueAtTime(0, now + 0.92);
+
+  osc.connect(formant);
+  formant.connect(masterGain);
+  masterGain.connect(ctx.destination);
+
+  vibrato.start(now); vibrato.stop(now + 1);
+  osc.start(now); osc.stop(now + 1);
 }
 
 // ============================================================
