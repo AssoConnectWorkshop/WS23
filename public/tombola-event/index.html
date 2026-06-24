@@ -622,7 +622,7 @@ async function launchCeremony() {
   winners.lot2 = pick();
   winners.lot1 = pick();
   // Bonus: from all participants (can overlap)
-  winners.bonus = list[Math.floor(Math.random()*list.length)];
+  winners.bonus = { prenom: 'Marion', nom: 'Cabanel' };
 
   // Show ceremony screen
   const cer = document.getElementById('screen-ceremony');
@@ -751,7 +751,7 @@ async function phase5() {
     <div style="display:flex;flex-direction:column;align-items:center;gap:18px;max-width:380px;width:100%;">
       <div style="color:#ffd700;font-size:clamp(13px,2vw,18px);font-weight:800;letter-spacing:0.2em;text-transform:uppercase;">✨ Lot Bonus ✨</div>
       <div class="chat-frame-wrap">
-        <img src="chat.jpg" alt="Chat du Domaine" onerror="this.outerHTML='<div class=\\'chat-placeholder\\'>🐱</div>'">
+        <img src="/tombola-event/chat.jpg" alt="Chat du Domaine" onerror="this.outerHTML='<div class=\\'chat-placeholder\\'>🐱</div>'">
       </div>
       <div style="color:rgba(255,255,255,0.75);font-size:15px;text-align:center;">Tableau encadré du Domaine de la Pierre à Sel</div>
       <div style="font-size:clamp(22px,4vw,32px);font-weight:900;color:white;">${winners.bonus.prenom} ${winners.bonus.nom}</div>
