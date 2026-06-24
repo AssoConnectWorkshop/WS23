@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 
 interface Participant {
   id: number;
@@ -152,7 +152,7 @@ export default function Tombola() {
               min={1}
               max={participants.length || 1}
               value={numPrizes}
-              onChange={(e) => {
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                 setNumPrizes(Math.max(1, parseInt(e.target.value) || 1));
                 setWinners(null);
               }}
