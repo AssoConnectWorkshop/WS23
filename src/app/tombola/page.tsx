@@ -70,20 +70,22 @@ export default function Tombola() {
   const canDraw = participants.length >= numPrizes && numPrizes >= 1;
 
   return (
-    <main className="min-h-screen bg-amber-50 p-6 flex flex-col items-center gap-8">
+    <main className="min-h-screen p-6 flex flex-col items-center gap-8" style={{ backgroundColor: "#f0f4ff" }}>
       <div className="flex flex-col items-center gap-2">
         <span className="text-6xl">🎟️</span>
-        <h1 className="text-4xl font-bold text-amber-900">Tombola</h1>
-        <p className="text-amber-700">Tirez au sort vos gagnants en toute transparence</p>
+        <h1 className="text-4xl font-bold" style={{ color: "#1a1a2e" }}>Tombola</h1>
+        <p style={{ color: "#2764F0" }} className="text-lg font-medium">Tirez au sort vos gagnants en toute transparence</p>
       </div>
 
       <div className="w-full max-w-2xl flex flex-col gap-6">
-        {/* Ajout de participants */}
-        <section className="bg-white rounded-2xl p-6 shadow flex flex-col gap-4">
-          <h2 className="text-lg font-semibold text-amber-900">Participants</h2>
+        <section className="bg-white rounded-2xl p-6 shadow-md flex flex-col gap-4" style={{ borderTop: "3px solid #2764F0" }}>
+          <h2 className="text-lg font-semibold" style={{ color: "#2764F0" }}>Participants</h2>
           <div className="flex gap-2">
             <textarea
-              className="flex-1 border border-amber-200 rounded-xl px-4 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-amber-400"
+              className="flex-1 rounded-xl px-4 py-2 text-sm resize-none focus:outline-none"
+              style={{ border: "1.5px solid #c7d7fd" , boxShadow: "0 0 0 0px #2764F0" }}
+              onFocus={(e) => (e.currentTarget.style.boxShadow = "0 0 0 2px #2764F0")}
+              onBlur={(e) => (e.currentTarget.style.boxShadow = "none")}
               rows={2}
               placeholder="Un nom par ligne, ou séparés par virgule/point-virgule…"
               value={input}
@@ -97,7 +99,10 @@ export default function Tombola() {
             />
             <button
               onClick={() => addParticipant(input)}
-              className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl transition-all active:scale-95"
+              className="px-4 py-2 text-white font-semibold rounded-xl transition-all active:scale-95"
+              style={{ backgroundColor: "#2764F0" }}
+              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#1a50d4")}
+              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#2764F0")}
             >
               Ajouter
             </button>
@@ -109,18 +114,22 @@ export default function Tombola() {
                 <span
                   key={p.id}
                   className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium transition-all duration-300 ${
-                    highlighted === p.id
-                      ? "bg-yellow-300 text-yellow-900 scale-110 shadow-lg"
-                      : winners?.some((w) => w.participant.id === p.id)
-                      ? "bg-green-100 text-green-800 line-through opacity-60"
-                      : "bg-amber-100 text-amber-800"
+                    highlighted === p.id ? "scale-110 shadow-lg" : ""
                   }`}
+                  style={
+                    highlighted === p.id
+                      ? { backgroundColor: "#ffd600", color: "#1a1a2e" }
+                      : winners?.some((w) => w.participant.id === p.id)
+                      ? { backgroundColor: "#e6edff", color: "#2764F0", textDecoration: "line-through", opacity: 0.6 }
+                      : { backgroundColor: "#e6edff", color: "#2764F0" }
+                  }
                 >
                   {p.name}
                   {!drawing && (
                     <button
                       onClick={() => removeParticipant(p.id)}
-                      className="ml-1 text-amber-400 hover:text-red-500 font-bold leading-none"
+                      className="ml-1 font-bold leading-none hover:text-red-500"
+                      style={{ color: "#7ca4f8" }}
                     >
                       ×
                     </button>
@@ -132,21 +141,20 @@ export default function Tombola() {
             <p className="text-sm text-gray-400 italic">Aucun participant pour l&apos;instant.</p>
           )}
 
-          <div className="flex items-center justify-between text-sm text-amber-700">
+          <div className="flex items-center justify-between text-sm" style={{ color: "#2764F0" }}>
             <span>{participants.length} participant{participants.length > 1 ? "s" : ""}</span>
             {participants.length > 0 && !drawing && (
-              <button onClick={reset} className="text-red-400 hover:text-red-600 text-xs underline">
+              <button onClick={reset} className="text-xs underline text-red-400 hover:text-red-600">
                 Tout effacer
               </button>
             )}
           </div>
         </section>
 
-        {/* Paramètres du tirage */}
-        <section className="bg-white rounded-2xl p-6 shadow flex flex-col gap-4">
-          <h2 className="text-lg font-semibold text-amber-900">Tirage</h2>
+        <section className="bg-white rounded-2xl p-6 shadow-md flex flex-col gap-4" style={{ borderTop: "3px solid #2764F0" }}>
+          <h2 className="text-lg font-semibold" style={{ color: "#2764F0" }}>Tirage</h2>
           <div className="flex items-center gap-4">
-            <label className="text-sm text-amber-800 font-medium">Nombre de gagnants :</label>
+            <label className="text-sm font-medium" style={{ color: "#1a1a2e" }}>Nombre de gagnants :</label>
             <input
               type="number"
               min={1}
@@ -156,7 +164,8 @@ export default function Tombola() {
                 setNumPrizes(Math.max(1, parseInt(e.target.value) || 1));
                 setWinners(null);
               }}
-              className="w-20 border border-amber-200 rounded-xl px-3 py-2 text-center font-bold text-amber-900 focus:outline-none focus:ring-2 focus:ring-amber-400"
+              className="w-20 rounded-xl px-3 py-2 text-center font-bold focus:outline-none"
+              style={{ border: "1.5px solid #c7d7fd", color: "#2764F0" }}
             />
           </div>
 
@@ -164,10 +173,11 @@ export default function Tombola() {
             onClick={draw}
             disabled={!canDraw || drawing}
             className={`w-full py-4 rounded-xl text-white text-xl font-bold transition-all ${
-              canDraw && !drawing
-                ? "bg-amber-500 hover:bg-amber-600 active:scale-95 shadow-md"
-                : "bg-gray-300 cursor-not-allowed"
+              canDraw && !drawing ? "active:scale-95 shadow-md" : "cursor-not-allowed"
             } ${drumroll ? "animate-pulse" : ""}`}
+            style={{ backgroundColor: canDraw && !drawing ? "#2764F0" : "#d1d5db" }}
+            onMouseOver={(e) => { if (canDraw && !drawing) e.currentTarget.style.backgroundColor = "#1a50d4"; }}
+            onMouseOut={(e) => { if (canDraw && !drawing) e.currentTarget.style.backgroundColor = "#2764F0"; }}
           >
             {drawing ? "🥁 Tirage en cours…" : "🎉 Lancer le tirage !"}
           </button>
@@ -179,27 +189,28 @@ export default function Tombola() {
           )}
         </section>
 
-        {/* Résultats */}
         {winners && winners.length > 0 && (
-          <section className="bg-white rounded-2xl p-6 shadow flex flex-col gap-4">
-            <h2 className="text-lg font-semibold text-green-800">
+          <section className="bg-white rounded-2xl p-6 shadow-md flex flex-col gap-4" style={{ borderTop: "3px solid #2764F0" }}>
+            <h2 className="text-lg font-semibold" style={{ color: "#2764F0" }}>
               🏆 Résultats du tirage
             </h2>
             <ol className="flex flex-col gap-3">
               {winners.map((w) => (
                 <li
                   key={w.participant.id}
-                  className="flex items-center gap-4 bg-green-50 border border-green-200 rounded-xl px-5 py-3"
+                  className="flex items-center gap-4 rounded-xl px-5 py-3"
+                  style={{ backgroundColor: "#e6edff", border: "1.5px solid #c7d7fd" }}
                 >
                   <span className="text-2xl">{w.prize === 1 ? "🥇" : w.prize === 2 ? "🥈" : w.prize === 3 ? "🥉" : `#${w.prize}`}</span>
-                  <span className="text-lg font-semibold text-green-900">{w.participant.name}</span>
+                  <span className="text-lg font-semibold" style={{ color: "#1a1a2e" }}>{w.participant.name}</span>
                 </li>
               ))}
             </ol>
             <button
               onClick={draw}
               disabled={drawing}
-              className="text-sm text-amber-600 hover:text-amber-800 underline self-center"
+              className="text-sm underline self-center"
+              style={{ color: "#2764F0" }}
             >
               Relancer un tirage
             </button>
