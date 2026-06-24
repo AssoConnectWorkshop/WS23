@@ -62,8 +62,8 @@ export default function Generateur() {
     <main className="flex min-h-screen flex-col items-center justify-center gap-10 p-8 bg-green-50">
       <div className="flex flex-col items-center gap-2 text-center">
         <span className="text-6xl">🌿</span>
-        <h1 className="text-4xl font-bold text-green-900">Générateur de Nom d'Asso</h1>
-        <p className="text-green-700 text-lg">Thème : la nature (et l'absurde)</p>
+        <h1 className="text-4xl font-bold text-green-900">Générateur de Nom d&apos;Asso</h1>
+        <p className="text-green-700 text-lg">Thème : la nature (et l&apos;absurde)</p>
       </div>
 
       <div
