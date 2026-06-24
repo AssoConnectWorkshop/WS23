@@ -468,13 +468,24 @@ function stopAll() {
 
 function playDrumroll(durationMs) {
   stopAll();
-  const noise = new Tone.NoiseSynth({
-    noise: { type: 'brown' },
-    envelope: { attack: 0.001, decay: 0.06, sustain: 0.2, release: 0.05 },
-    volume: -6
+  // Machine gun: fast metallic clicks + white noise bursts
+  const click = new Tone.MembraneSynth({
+    pitchDecay: 0.005,
+    octaves: 3,
+    envelope: { attack: 0.001, decay: 0.04, sustain: 0, release: 0.01 },
+    volume: -2
   }).toDestination();
-  activeNodes.push(noise);
-  const loop = new Tone.Loop(time => { noise.triggerAttackRelease('32n', time); }, '32n');
+  const noise = new Tone.NoiseSynth({
+    noise: { type: 'white' },
+    envelope: { attack: 0.001, decay: 0.025, sustain: 0, release: 0.01 },
+    volume: -10
+  }).toDestination();
+  activeNodes.push(click, noise);
+  Tone.Transport.bpm.value = 480;
+  const loop = new Tone.Loop(time => {
+    click.triggerAttackRelease('C1', '64n', time);
+    noise.triggerAttackRelease('64n', time);
+  }, '16n');
   loop.start(0);
   Tone.Transport.start();
   drumLoop = loop;
@@ -622,7 +633,7 @@ async function launchCeremony() {
   winners.lot2 = pick();
   winners.lot1 = pick();
   // Bonus: from all participants (can overlap)
-  winners.bonus = { prenom: 'Marion', nom: 'Cabanel' };
+  winners.bonus = list[Math.floor(Math.random()*list.length)];
 
   // Show ceremony screen
   const cer = document.getElementById('screen-ceremony');
