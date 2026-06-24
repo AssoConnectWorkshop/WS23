@@ -345,7 +345,7 @@ function generateQR(elId) {
   el.innerHTML = '';
   const encoded = encodeURIComponent(url);
   const img = document.createElement('img');
-  img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' + encoded + '&color=1E4FCC&bgcolor=FFFFFF&margin=10';
+  img.src = '/api/qrcode?data=' + encoded;
   img.alt = 'QR Code inscription';
   img.style.cssText = 'width:180px;height:180px;border-radius:8px;display:block;';
   img.onerror = () => { el.innerHTML = '<p style="color:#888;font-size:12px;padding:20px;">QR indisponible —<br>utilisez le bouton ci-dessous</p>'; };
