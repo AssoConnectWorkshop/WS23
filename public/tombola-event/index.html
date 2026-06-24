@@ -59,7 +59,7 @@ body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background
 @keyframes fadeInUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
 @keyframes countdownPop { 0%{transform:scale(2.5);opacity:0} 40%{transform:scale(0.9);opacity:1} 100%{transform:scale(1);opacity:1} }
 @keyframes bounceIn { 0%{transform:translateY(-120px) scale(0.4);opacity:0} 60%{transform:translateY(10px) scale(1.1)} 100%{transform:translateY(0) scale(1);opacity:1} }
-@keyframes bgPulse { 0%,100%{background:#000} 50%{background:#1E4FCC} }
+@keyframes bgPulse { 0%,100%{background:#1E4FCC} 50%{background:#00C897} }
 @keyframes floatStar { from{transform:translateY(110vh) rotate(0deg);opacity:1} to{transform:translateY(-80px) rotate(720deg);opacity:0} }
 @keyframes rainDrop { from{transform:translateY(-60px) rotate(0deg)} to{transform:translateY(110vh) rotate(360deg)} }
 @keyframes frameGlow { 0%,100%{box-shadow:0 0 20px gold,0 0 50px rgba(255,215,0,0.5)} 50%{box-shadow:0 0 60px gold,0 0 120px gold,0 0 6px white} }
@@ -76,7 +76,7 @@ body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background
 
 /* CEREMONY */
 #screen-ceremony {
-  background: #000; color: white; padding: 0;
+  background: linear-gradient(135deg, #1E4FCC 0%, #0a3aaa 100%); color: white; padding: 0;
   overflow: hidden; position: fixed; inset: 0; z-index: 100;
 }
 .ceremony-content {
@@ -272,7 +272,7 @@ body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background
 </div>
 
 <!-- ========== CEREMONY ========== -->
-<div id="screen-ceremony" class="screen" style="display:none; position:fixed; inset:0; background:#000; z-index:100;">
+<div id="screen-ceremony" class="screen" style="display:none; position:fixed; inset:0; background:linear-gradient(135deg,#1E4FCC 0%,#0a3aaa 100%); z-index:100;">
   <div class="ceremony-content" id="ceremony-content"></div>
 </div>
 
@@ -652,7 +652,7 @@ async function launchCeremony() {
 // PHASE 1 — Suspense
 async function phase1() {
   const cer = document.getElementById('screen-ceremony');
-  cer.style.background = '#000';
+  cer.style.background = 'linear-gradient(135deg,#1E4FCC 0%,#0a3aaa 100%)';
   setCeremony(`
     <div class="ceremony-label">Préparez-vous...</div>
     <div class="ceremony-text" id="tw" style="font-size:clamp(24px,5vw,48px);font-weight:700;color:#4A90E2;min-height:60px;"></div>
@@ -674,7 +674,7 @@ async function phase1() {
 // PHASE 2 — 3e prix : Shot de Génépi
 async function phase2() {
   const cer = document.getElementById('screen-ceremony');
-  cer.style.background = '#050510';
+  cer.style.background = 'linear-gradient(135deg,#1E4FCC 0%,#0d2fa0 100%)';
   setCeremony(`
     <div class="ceremony-label">3e prix</div>
     <div class="ceremony-sublabel">Un shot de génépi 🥃</div>
@@ -699,7 +699,7 @@ async function phase2() {
 // PHASE 3 — 2e prix : Corbeille de fruits
 async function phase3() {
   const cer = document.getElementById('screen-ceremony');
-  cer.style.background = '#050510';
+  cer.style.background = 'linear-gradient(135deg,#1E4FCC 0%,#0d2fa0 100%)';
   setCeremony(`
     <div class="ceremony-label">2e prix</div>
     <div class="ceremony-sublabel">Une corbeille de fruits 🍎</div>
@@ -725,7 +725,7 @@ async function phase3() {
 // PHASE 4 — 1er prix : GLACE
 async function phase4() {
   const cer = document.getElementById('screen-ceremony');
-  cer.style.background = '#000';
+  cer.style.background = 'linear-gradient(135deg,#1E4FCC 0%,#0a3aaa 100%)';
   setCeremony(`<div class="ceremony-label" style="letter-spacing:0.4em;font-size:clamp(12px,2vw,18px);opacity:0.5;">LE GRAND LOT</div>`);
   await wait(5000); // Maximum silence & suspense
   stopAll();
@@ -749,13 +749,13 @@ async function phase4() {
   await wait(10000);
   stopAll();
   cer.style.animation = '';
-  cer.style.background = '#000';
+  cer.style.background = 'linear-gradient(135deg,#1E4FCC 0%,#0a3aaa 100%)';
 }
 
 // PHASE 5 — Lot bonus : Photo du chat
 async function phase5() {
   const cer = document.getElementById('screen-ceremony');
-  cer.style.background = '#0e0e1a';
+  cer.style.background = 'linear-gradient(135deg,#1E4FCC 0%,#0a3aaa 100%)';
   cer.style.animation = '';
 
   setCeremony(`
