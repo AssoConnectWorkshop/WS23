@@ -1,21 +1,20 @@
 import QRCode from "qrcode";
-import { NextResponse } from "next/server";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const data = searchParams.get("data");
-  if (!data) return NextResponse.json({ error: "missing data" }, { status: 400 });
+  if (!data) return new Response("missing data", { status: 400 });
 
-  const png = await QRCode.toBuffer(data, {
-    type: "png",
+  const svg = await QRCode.toString(data, {
+    type: "svg",
     width: 300,
     margin: 2,
     color: { dark: "#1E4FCC", light: "#FFFFFF" },
   });
 
-  return new Response(png, {
+  return new Response(svg, {
     headers: {
-      "Content-Type": "image/png",
+      "Content-Type": "image/svg+xml",
       "Cache-Control": "public, max-age=86400",
     },
   });
