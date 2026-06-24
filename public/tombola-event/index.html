@@ -58,6 +58,7 @@ body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background
 @keyframes checkPop { 0%{transform:scale(0);opacity:0} 60%{transform:scale(1.2)} 100%{transform:scale(1);opacity:1} }
 @keyframes fadeInUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
 @keyframes countdownPop { 0%{transform:scale(2.5);opacity:0} 40%{transform:scale(0.9);opacity:1} 100%{transform:scale(1);opacity:1} }
+@keyframes drumFloat { 0%{transform:translateY(0) rotate(-10deg) scale(1);opacity:1} 50%{transform:translateY(-45vh) rotate(15deg) scale(1.15);opacity:1} 100%{transform:translateY(-95vh) rotate(-5deg) scale(0.9);opacity:0} }
 @keyframes bounceIn { 0%{transform:translateY(-120px) scale(0.4);opacity:0} 60%{transform:translateY(10px) scale(1.1)} 100%{transform:translateY(0) scale(1);opacity:1} }
 @keyframes bgPulse { 0%,100%{background:#1E4FCC} 50%{background:#00C897} }
 @keyframes floatStar { from{transform:translateY(110vh) rotate(0deg);opacity:1} to{transform:translateY(-80px) rotate(720deg);opacity:0} }
@@ -554,7 +555,29 @@ function playDrumroll(durationMs) {
   scheduleGroove();
   scheduleRoll();
 
-  drumLoop = { stop: () => {}, dispose: () => { stopped = true; } };
+  // Emojis tambour animés
+  const drumContainer = document.createElement('div');
+  drumContainer.id = 'drum-emojis';
+  drumContainer.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:8000;overflow:hidden;';
+  document.body.appendChild(drumContainer);
+
+  const drumEmojis = ['🥁','🥁','🪘','🥁','🪘','🥁'];
+  let emojiI = 0;
+  const emojiInterval = setInterval(() => {
+    if (stopped) { clearInterval(emojiInterval); drumContainer.remove(); return; }
+    const em = document.createElement('div');
+    const emoji = drumEmojis[emojiI % drumEmojis.length];
+    emojiI++;
+    const x = 5 + Math.random() * 90;
+    const size = 28 + Math.random() * 28;
+    em.textContent = emoji;
+    em.style.cssText = `position:absolute;left:${x}%;top:105%;font-size:${size}px;animation:drumFloat 1.1s ease-out forwards;`;
+    drumContainer.appendChild(em);
+    setTimeout(() => em.remove(), 1200);
+  }, 220);
+
+  const origDispose = () => { stopped = true; };
+  drumLoop = { stop: () => {}, dispose: () => { origDispose(); clearInterval(emojiInterval); drumContainer.remove(); } };
   if (durationMs) setTimeout(() => stopAll(), durationMs);
 }
 
