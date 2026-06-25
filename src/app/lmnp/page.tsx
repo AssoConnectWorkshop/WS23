@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 
 const BLUE = "#1E4FCC";
 const TEAL = "#00C897";
@@ -152,12 +152,13 @@ export default function LMNPPage() {
   const [error, setError] = useState("");
   const [images, setImages] = useState<string[]>([]);
   const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const set = useCallback((key: keyof Inputs, val: number | string) => {
     setInputs(prev => ({ ...prev, [key]: val }));
   }, []);
 
-  const addImages = (files: FileList | File[]) => {
+  const addImages = useCallback((files: FileList | File[]) => {
     Array.from(files).forEach(file => {
       if (!file.type.startsWith("image/")) return;
       const reader = new FileReader();
@@ -167,12 +168,22 @@ export default function LMNPPage() {
       };
       reader.readAsDataURL(file);
     });
-  };
+  }, []);
+
+  // Global paste listener so Ctrl+V works anywhere on the page
+  useEffect(() => {
+    const handler = (e: ClipboardEvent) => {
+      const files = Array.from(e.clipboardData?.files ?? []).filter(f => f.type.startsWith("image/"));
+      if (files.length) { e.preventDefault(); addImages(files); }
+    };
+    document.addEventListener("paste", handler);
+    return () => document.removeEventListener("paste", handler);
+  }, [addImages]);
 
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     const files = Array.from(e.clipboardData.files).filter(f => f.type.startsWith("image/"));
     if (files.length) { e.preventDefault(); addImages(files); }
-  }, []);
+  }, [addImages]);
 
   const parseAnnonce = async () => {
     setLoading(true);
@@ -301,7 +312,7 @@ export default function LMNPPage() {
             onDragLeave={() => setDragOver(false)}
             onDrop={e => { e.preventDefault(); setDragOver(false); addImages(e.dataTransfer.files); }}
             onPaste={handlePaste}
-            onClick={() => document.getElementById("img-upload")?.click()}
+            onClick={() => fileInputRef.current?.click()}
             style={{
               marginTop: 10, padding: "14px 16px", borderRadius: 12, cursor: "pointer",
               border: `2px dashed ${dragOver ? BLUE : "#C7D2FD"}`,
@@ -311,8 +322,8 @@ export default function LMNPPage() {
           >
             📸 Dépose ou colle des screenshots de l&apos;annonce ici
             <input
-              id="img-upload" type="file" accept="image/*" multiple hidden
-              onChange={e => e.target.files && addImages(e.target.files)}
+              ref={fileInputRef} type="file" accept="image/*" multiple hidden
+              onChange={e => { if (e.target.files) addImages(e.target.files); e.target.value = ""; }}
             />
           </div>
 
