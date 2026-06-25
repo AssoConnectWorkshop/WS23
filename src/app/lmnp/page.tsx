@@ -150,50 +150,78 @@ export default function LMNPPage() {
   const [parsed, setParsed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [images, setImages] = useState<string[]>([]);
+  const [dragOver, setDragOver] = useState(false);
 
   const set = useCallback((key: keyof Inputs, val: number | string) => {
     setInputs(prev => ({ ...prev, [key]: val }));
   }, []);
 
-  const parseAnnonce = async () => {
-    const text = inputs.annonce.trim();
-    const isUrl = /^https?:\/\//i.test(text);
+  const addImages = (files: FileList | File[]) => {
+    Array.from(files).forEach(file => {
+      if (!file.type.startsWith("image/")) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        const b64 = e.target?.result as string;
+        setImages(prev => prev.includes(b64) ? prev : [...prev, b64]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
 
-    if (isUrl) {
-      setLoading(true);
-      setError("");
-      try {
-        const res = await fetch("/api/lmnp", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ annonce: text }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Erreur serveur");
-        setInputs(prev => ({
-          ...prev,
-          prix: data.prix || prev.prix,
-          surface: data.surface || prev.surface,
-          ville: data.ville || prev.ville,
-          loyer: data.loyerEstime || prev.loyer,
-        }));
-        setParsed(true);
-      } catch (e) {
-        setError((e as Error).message);
-      } finally {
-        setLoading(false);
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const files = Array.from(e.clipboardData.files).filter(f => f.type.startsWith("image/"));
+    if (files.length) { e.preventDefault(); addImages(files); }
+  }, []);
+
+  const parseAnnonce = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      let body: Record<string, unknown>;
+
+      if (images.length > 0) {
+        body = { images };
+      } else {
+        const text = inputs.annonce.trim();
+        const isUrl = /^https?:\/\//i.test(text);
+        if (!isUrl) {
+          const { prix, surface, ville, pieces: _pieces } = parseListingText(text);
+          const loyer = surface > 0 ? loyerEstime(surface, ville) : 0;
+          setInputs(prev => ({
+            ...prev,
+            prix: prix || prev.prix,
+            surface: surface || prev.surface,
+            ville: ville || prev.ville,
+            loyer: loyer || prev.loyer,
+          }));
+          setParsed(true);
+          setLoading(false);
+          return;
+        }
+        body = { annonce: text };
       }
-    } else {
-      const { prix, surface, ville, pieces: _pieces } = parseListingText(text);
-      const loyer = surface > 0 ? loyerEstime(surface, ville) : 0;
+
+      const res = await fetch("/api/lmnp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur serveur");
       setInputs(prev => ({
         ...prev,
-        prix: prix || prev.prix,
-        surface: surface || prev.surface,
-        ville: ville || prev.ville,
-        loyer: loyer || prev.loyer,
+        prix: data.prix || prev.prix,
+        surface: data.surface || prev.surface,
+        ville: data.ville || prev.ville,
+        loyer: data.loyerEstime || prev.loyer,
       }));
       setParsed(true);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -255,26 +283,69 @@ export default function LMNPPage() {
         <section style={{ background: "white", borderRadius: 20, padding: 24, boxShadow: "0 2px 16px rgba(0,0,0,0.07)", border: `1px solid #e2e8f0` }}>
           <h2 style={{ fontSize: 16, fontWeight: 700, color: BLUE, marginBottom: 12 }}>📋 Colle ton annonce</h2>
           <textarea
-            rows={6}
-            placeholder="Colle ici le texte de l'annonce LeBonCoin, SeLoger, PAP..."
+            rows={4}
+            placeholder="Colle ici le lien ou le texte de l'annonce (SeLoger, LeBonCoin, PAP…)"
             value={inputs.annonce}
             onChange={e => set("annonce", e.target.value)}
+            onPaste={handlePaste}
             style={{
               width: "100%", padding: "12px 14px", borderRadius: 12, fontSize: 14,
               border: "1.5px solid #C7D2FD", outline: "none", resize: "vertical",
               fontFamily: "inherit", lineHeight: 1.5,
             }}
           />
-          <button
-            onClick={parseAnnonce}
-            disabled={!inputs.annonce.trim() || loading}
+
+          {/* Drop zone images */}
+          <div
+            onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={e => { e.preventDefault(); setDragOver(false); addImages(e.dataTransfer.files); }}
+            onPaste={handlePaste}
+            onClick={() => document.getElementById("img-upload")?.click()}
             style={{
-              marginTop: 12, padding: "12px 28px", borderRadius: 12, fontSize: 15, fontWeight: 700,
-              background: inputs.annonce.trim() && !loading ? `linear-gradient(135deg, ${BLUE}, ${TEAL})` : "#e2e8f0",
-              color: inputs.annonce.trim() && !loading ? "white" : "#aaa", border: "none", cursor: inputs.annonce.trim() && !loading ? "pointer" : "default",
+              marginTop: 10, padding: "14px 16px", borderRadius: 12, cursor: "pointer",
+              border: `2px dashed ${dragOver ? BLUE : "#C7D2FD"}`,
+              background: dragOver ? "#EEF2FF" : "#F8FAFF",
+              textAlign: "center", fontSize: 13, color: "#888", transition: "all 0.15s",
             }}
           >
-            {loading ? "⏳ Chargement de la page…" : "🔍 Analyser l'annonce"}
+            📸 Dépose ou colle des screenshots de l&apos;annonce ici
+            <input
+              id="img-upload" type="file" accept="image/*" multiple hidden
+              onChange={e => e.target.files && addImages(e.target.files)}
+            />
+          </div>
+
+          {/* Thumbnails */}
+          {images.length > 0 && (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+              {images.map((src, i) => (
+                <div key={i} style={{ position: "relative" }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={src} alt="" style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 8, border: "1.5px solid #C7D2FD" }} />
+                  <button
+                    onClick={() => setImages(prev => prev.filter((_, j) => j !== i))}
+                    style={{
+                      position: "absolute", top: -6, right: -6, width: 18, height: 18,
+                      borderRadius: "50%", background: RED, color: "white", border: "none",
+                      cursor: "pointer", fontSize: 10, lineHeight: "18px", textAlign: "center", padding: 0,
+                    }}
+                  >✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button
+            onClick={parseAnnonce}
+            disabled={(!inputs.annonce.trim() && images.length === 0) || loading}
+            style={{
+              marginTop: 12, padding: "12px 28px", borderRadius: 12, fontSize: 15, fontWeight: 700,
+              background: (inputs.annonce.trim() || images.length > 0) && !loading ? `linear-gradient(135deg, ${BLUE}, ${TEAL})` : "#e2e8f0",
+              color: (inputs.annonce.trim() || images.length > 0) && !loading ? "white" : "#aaa", border: "none", cursor: (inputs.annonce.trim() || images.length > 0) && !loading ? "pointer" : "default",
+            }}
+          >
+            {loading ? "⏳ Analyse en cours…" : images.length > 0 ? "🔍 Analyser les screenshots" : "🔍 Analyser l'annonce"}
           </button>
           {parsed && !error && (
             <p style={{ marginTop: 8, fontSize: 13, color: TEAL, fontWeight: 600 }}>

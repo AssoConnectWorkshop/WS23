@@ -1,4 +1,9 @@
+import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
+
+const anthropic = process.env.ANTHROPIC_API_KEY
+  ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  : null;
 
 export interface ParsedListing {
   prix: number;
@@ -144,8 +149,79 @@ async function fetchListingText(url: string): Promise<string> {
   return res.text();
 }
 
+async function extractFromImages(images: string[]): Promise<{ prix: number; surface: number; ville: string; nbPieces: number; estNeuf: boolean; codePostal: string }> {
+  if (!anthropic) throw new Error("Clé API Anthropic manquante — configure ANTHROPIC_API_KEY sur Vercel");
+
+  const imageContent: Anthropic.ImageBlockParam[] = images.map((b64) => {
+    const [header, data] = b64.split(",");
+    const mediaType = (header.match(/data:([^;]+);/) || [])[1] as "image/jpeg" | "image/png" | "image/webp" | "image/gif";
+    return {
+      type: "image",
+      source: { type: "base64", media_type: mediaType || "image/jpeg", data },
+    };
+  });
+
+  const msg = await anthropic.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 512,
+    messages: [{
+      role: "user",
+      content: [
+        ...imageContent,
+        {
+          type: "text",
+          text: `Tu vois des screenshots d'une annonce immobilière française. Extrais en JSON strict (pas de markdown) :
+{"prix":0,"surface":0,"ville":"","codePostal":"","nbPieces":1,"estNeuf":false}
+- prix : prix de vente en euros (entier, 0 si absent)
+- surface : m² (entier)
+- ville : nom de la ville
+- codePostal : code postal 5 chiffres ou ""
+- nbPieces : nombre de pièces (1 si studio)
+- estNeuf : true si neuf/VEFA`,
+        },
+      ],
+    }],
+  });
+
+  const text = msg.content[0].type === "text" ? msg.content[0].text.trim() : "{}";
+  const parsed = JSON.parse(text.replace(/```json?|```/g, "").trim());
+  return {
+    prix: parsed.prix || 0,
+    surface: parsed.surface || 0,
+    ville: parsed.ville || "",
+    codePostal: parsed.codePostal || "",
+    nbPieces: parsed.nbPieces || 1,
+    estNeuf: Boolean(parsed.estNeuf),
+  };
+}
+
 export async function POST(req: NextRequest) {
-  const { annonce } = await req.json();
+  const body = await req.json();
+  const { annonce, images } = body as { annonce?: string; images?: string[] };
+
+  // Images mode
+  if (images && images.length > 0) {
+    let extracted;
+    try {
+      extracted = await extractFromImages(images);
+    } catch (e) {
+      return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+    }
+    const { loyer, loyerM2 } = estimerLoyer(extracted.ville, extracted.surface);
+    return NextResponse.json({
+      prix: extracted.prix,
+      surface: extracted.surface,
+      ville: extracted.ville,
+      codePostal: extracted.codePostal,
+      typeBien: extracted.nbPieces <= 1 ? "studio" : `T${extracted.nbPieces - 1}`,
+      nbPieces: extracted.nbPieces,
+      anneeConstruction: null,
+      estNeuf: extracted.estNeuf,
+      description: `${extracted.nbPieces > 1 ? `T${extracted.nbPieces - 1}` : "Studio"} ${extracted.surface}m² à ${extracted.ville || "?"}`,
+      loyerEstime: loyer,
+      loyerM2,
+    } satisfies ParsedListing);
+  }
 
   if (!annonce || typeof annonce !== "string") {
     return NextResponse.json({ error: "Annonce manquante" }, { status: 400 });
