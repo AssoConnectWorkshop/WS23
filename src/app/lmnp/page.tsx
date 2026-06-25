@@ -148,22 +148,53 @@ export default function LMNPPage() {
     travaux: 0,
   });
   const [parsed, setParsed] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const set = useCallback((key: keyof Inputs, val: number | string) => {
     setInputs(prev => ({ ...prev, [key]: val }));
   }, []);
 
-  const parseAnnonce = () => {
-    const { prix, surface, ville, pieces: _pieces } = parseListingText(inputs.annonce);
-    const loyer = surface > 0 ? loyerEstime(surface, ville) : 0;
-    setInputs(prev => ({
-      ...prev,
-      prix: prix || prev.prix,
-      surface: surface || prev.surface,
-      ville: ville || prev.ville,
-      loyer: loyer || prev.loyer,
-    }));
-    setParsed(true);
+  const parseAnnonce = async () => {
+    const text = inputs.annonce.trim();
+    const isUrl = /^https?:\/\//i.test(text);
+
+    if (isUrl) {
+      setLoading(true);
+      setError("");
+      try {
+        const res = await fetch("/api/lmnp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ annonce: text }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Erreur serveur");
+        setInputs(prev => ({
+          ...prev,
+          prix: data.prix || prev.prix,
+          surface: data.surface || prev.surface,
+          ville: data.ville || prev.ville,
+          loyer: data.loyerEstime || prev.loyer,
+        }));
+        setParsed(true);
+      } catch (e) {
+        setError((e as Error).message);
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      const { prix, surface, ville, pieces: _pieces } = parseListingText(text);
+      const loyer = surface > 0 ? loyerEstime(surface, ville) : 0;
+      setInputs(prev => ({
+        ...prev,
+        prix: prix || prev.prix,
+        surface: surface || prev.surface,
+        ville: ville || prev.ville,
+        loyer: loyer || prev.loyer,
+      }));
+      setParsed(true);
+    }
   };
 
   const results = inputs.prix > 0 && inputs.loyer > 0 ? compute(inputs) : null;
@@ -236,18 +267,23 @@ export default function LMNPPage() {
           />
           <button
             onClick={parseAnnonce}
-            disabled={!inputs.annonce.trim()}
+            disabled={!inputs.annonce.trim() || loading}
             style={{
               marginTop: 12, padding: "12px 28px", borderRadius: 12, fontSize: 15, fontWeight: 700,
-              background: inputs.annonce.trim() ? `linear-gradient(135deg, ${BLUE}, ${TEAL})` : "#e2e8f0",
-              color: inputs.annonce.trim() ? "white" : "#aaa", border: "none", cursor: inputs.annonce.trim() ? "pointer" : "default",
+              background: inputs.annonce.trim() && !loading ? `linear-gradient(135deg, ${BLUE}, ${TEAL})` : "#e2e8f0",
+              color: inputs.annonce.trim() && !loading ? "white" : "#aaa", border: "none", cursor: inputs.annonce.trim() && !loading ? "pointer" : "default",
             }}
           >
-            🔍 Analyser l&apos;annonce
+            {loading ? "⏳ Chargement de la page…" : "🔍 Analyser l'annonce"}
           </button>
-          {parsed && (
+          {parsed && !error && (
             <p style={{ marginTop: 8, fontSize: 13, color: TEAL, fontWeight: 600 }}>
               ✓ Données extraites — vérifie et ajuste si besoin ci-dessous
+            </p>
+          )}
+          {error && (
+            <p style={{ marginTop: 8, fontSize: 13, color: RED, fontWeight: 600 }}>
+              ⚠️ {error}
             </p>
           )}
         </section>
