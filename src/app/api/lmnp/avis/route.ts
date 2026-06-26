@@ -41,6 +41,8 @@ Dossier en cours :
 **1. TON VERDICT** (2-3 phrases directes — dis clairement si c'est un bon deal ou pas et pourquoi)
 **2. CE QUI EST SOLIDE / CE QUI M'INQUIÈTE** (points forts et risques, bullet points avec des chiffres)
 **3. MES QUESTIONS** (3 à 5 questions précises pour affiner l'analyse)
+
+IMPORTANT pour les questions : toutes les données financières du dossier (prix, surface, loyer, apport, taux, durée, travaux, charges, rendements, cash-flow, amortissement) sont déjà connues — ne les demande pas. Pose uniquement des questions sur ce qui n'est pas dans le dossier : état du bien, DPE, charges de copropriété, situation locative actuelle, résidence principale ou non, concurrence locative dans le quartier, projet de revente, profil fiscal de l'investisseur, etc.
 Sois direct, sans langue de bois. Réponds en français.`,
     });
   } else {
