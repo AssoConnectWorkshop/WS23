@@ -181,7 +181,7 @@ function AddressAutocomplete({ surface, onSelect }: {
   return (
     <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 4 }}>
       <label style={{ fontSize: 12, fontWeight: 600, color: "#666", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-        Adresse du bien
+        Quartier / adresse — <span style={{ fontWeight: 400, color: "#e67e22" }}>crucial pour estimer le loyer</span>
       </label>
       <input
         type="text"
