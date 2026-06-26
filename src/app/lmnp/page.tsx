@@ -234,6 +234,9 @@ export default function LMNPPage() {
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loyerInfo, setLoyerInfo] = useState<{ loyerM2: number; precision: string; city: string } | null>(null);
+  const [contexte, setContexte] = useState("");
+  const [avis, setAvis] = useState("");
+  const [avisLoading, setAvisLoading] = useState(false);
 
   const set = useCallback((key: keyof Inputs, val: number | string) => {
     setInputs(prev => ({ ...prev, [key]: val }));
@@ -558,6 +561,71 @@ export default function LMNPPage() {
               <p style={{ fontSize: 11, color: "#aaa", marginTop: 12 }}>
                 * Estimation indicative. Consulte un comptable spécialisé LMNP pour optimiser ton montage fiscal.
               </p>
+            </section>
+
+            {/* Avis agent */}
+            <section style={{ background: "white", borderRadius: 20, padding: 24, boxShadow: "0 2px 16px rgba(0,0,0,0.07)", border: `1.5px solid ${BLUE}20` }}>
+              <h2 style={{ fontSize: 16, fontWeight: 700, color: BLUE, marginBottom: 4 }}>🧑‍💼 L&apos;avis de l&apos;agent</h2>
+              <p style={{ fontSize: 13, color: "#888", marginBottom: 14 }}>
+                Apporte des précisions sur le bien, le quartier, la copropriété, ton projet… L&apos;agent affinera son analyse.
+              </p>
+              <textarea
+                rows={4}
+                value={contexte}
+                onChange={e => setContexte(e.target.value)}
+                placeholder={"Ex : immeuble années 70, gardien, bon état général. Quartier en cours de gentrification. Je cherche à défiscaliser sur 10 ans, pas forcément à revendre…"}
+                style={{
+                  width: "100%", padding: "12px 14px", borderRadius: 12, fontSize: 14,
+                  border: "1.5px solid #C7D2FD", outline: "none", resize: "vertical",
+                  fontFamily: "inherit", lineHeight: 1.5, boxSizing: "border-box",
+                }}
+              />
+              <button
+                onClick={async () => {
+                  setAvisLoading(true);
+                  setAvis("");
+                  try {
+                    const res = await fetch("/api/lmnp/avis", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ inputs, results, contexte, loyerInfo }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error);
+                    setAvis(data.avis);
+                  } catch (e) {
+                    setAvis(`⚠️ ${(e as Error).message}`);
+                  } finally {
+                    setAvisLoading(false);
+                  }
+                }}
+                disabled={avisLoading}
+                style={{
+                  marginTop: 12, padding: "12px 24px", borderRadius: 12, fontSize: 15, fontWeight: 700,
+                  background: avisLoading ? "#e2e8f0" : `linear-gradient(135deg, ${BLUE}, #6366f1)`,
+                  color: avisLoading ? "#aaa" : "white", border: "none", cursor: avisLoading ? "default" : "pointer",
+                }}
+              >
+                {avisLoading ? "⏳ L'agent analyse le dossier…" : avis ? "🔄 Relancer l'analyse" : "🧑‍💼 Demander l'avis de l'agent"}
+              </button>
+
+              {avis && (
+                <div style={{ marginTop: 20, display: "flex", gap: 14, alignItems: "flex-start" }}>
+                  <div style={{
+                    width: 44, height: 44, borderRadius: "50%", flexShrink: 0, fontSize: 22,
+                    background: `linear-gradient(135deg, ${BLUE}, #6366f1)`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>🧑‍💼</div>
+                  <div style={{
+                    flex: 1, background: "#F8FAFF", borderRadius: "4px 16px 16px 16px",
+                    padding: "16px 18px", border: `1px solid ${BLUE}20`,
+                    fontSize: 14, lineHeight: 1.7, color: "#1a1a2e",
+                    whiteSpace: "pre-wrap",
+                  }}>
+                    {avis}
+                  </div>
+                </div>
+              )}
             </section>
 
             {/* Grille de lecture */}
