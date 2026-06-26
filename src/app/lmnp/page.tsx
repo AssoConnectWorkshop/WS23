@@ -550,9 +550,9 @@ export default function LMNPPage() {
   const [avisLoading, setAvisLoading] = useState(false);
   const [etatBien, setEtatBien] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
-  const [chargesOpen, setChargesOpen] = useState(false);
+  const [chargesOpen, setChargesOpen] = useState(true);
   const [cfDetailOpen, setCfDetailOpen] = useState(false);
-  const [lectureOpen, setLectureOpen] = useState(false);
+  const [lectureOpen, setLectureOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [tauxManuel, setTauxManuel] = useState(false);
 
@@ -614,13 +614,13 @@ export default function LMNPPage() {
         const isUrl = /^https?:\/\//i.test(text);
         if (!isUrl) {
           const { prix, surface, ville, pieces: _pieces } = parseListingText(text);
-          const loyer = surface > 0 ? loyerEstime(surface, ville) : 0;
+          const loyer = (surface > 0 && ville) ? loyerEstime(surface, ville) : 0;
           setInputs(prev => ({
             ...prev,
             prix: prix || prev.prix,
             surface: surface || prev.surface,
             ville: ville || prev.ville,
-            loyer: loyer || prev.loyer,
+            loyer: (loyer && !prev.loyer) ? loyer : prev.loyer,
           }));
           setParsed(true);
           setLoading(false);
@@ -641,7 +641,7 @@ export default function LMNPPage() {
         prix: data.prix || prev.prix,
         surface: data.surface || prev.surface,
         ville: data.ville || prev.ville,
-        loyer: data.loyerEstime || prev.loyer,
+        loyer: (data.loyerEstime && data.ville && !prev.loyer) ? data.loyerEstime : prev.loyer,
         travaux: data.travauxEstime != null && data.travauxEstime > 0 ? data.travauxEstime : prev.travaux,
         taxeFonciere: data.taxeFonciere != null && data.taxeFonciere > 0 ? data.taxeFonciere : prev.taxeFonciere,
         // chargesCopro is monthly → annualize and add to charges% approximation is impractical; store as taxeFonciere override only

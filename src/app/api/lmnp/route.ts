@@ -231,17 +231,26 @@ export async function POST(req: NextRequest) {
       const pieces = deepFind(nextData, ["rooms", "roomsCount", "nbRooms", "nbPieces"]);
       const neuf = deepFind(nextData, ["isNew", "estNeuf", "newProperty"]);
 
+      const strippedText = stripHtml(html);
+      const textExtracted = extractFromText(strippedText);
       if (prix || surface) {
+        const prixNum = typeof prix === "number" ? prix : parseInt(String(prix || "0").replace(/\D/g, "")) || 0;
+        const surfaceNum = typeof surface === "number" ? surface : parseInt(String(surface || "0")) || 0;
+        // Cross-validate: if text extraction found a price and it differs significantly from deepFind, trust text
+        const textPrix = textExtracted.prix;
+        const prixFinal = (textPrix > 0 && prixNum > 0 && Math.abs(prixNum - textPrix) / textPrix > 0.3)
+          ? textPrix  // text and JSON disagree by >30% → trust text (visible price in HTML)
+          : prixNum;
         extracted = {
-          prix: typeof prix === "number" ? prix : parseInt(String(prix || "0").replace(/\D/g, "")) || 0,
-          surface: typeof surface === "number" ? surface : parseInt(String(surface || "0")) || 0,
-          ville: String(ville || ""),
+          prix: prixFinal,
+          surface: surfaceNum || textExtracted.surface,
+          ville: String(ville || textExtracted.ville || ""),
           nbPieces: typeof pieces === "number" ? pieces : parseInt(String(pieces || "1")) || 1,
           estNeuf: Boolean(neuf),
-          codePostal: String(cp || ""),
+          codePostal: String(cp || textExtracted.codePostal || ""),
         };
       } else {
-        extracted = extractFromText(stripHtml(html));
+        extracted = textExtracted;
       }
     } else {
       // JSON-LD fallback
