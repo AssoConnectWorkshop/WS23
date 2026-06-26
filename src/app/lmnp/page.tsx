@@ -340,18 +340,13 @@ export default function LMNPPage() {
 
   const results = inputs.prix > 0 && inputs.loyer > 0 ? compute(inputs) : null;
 
-  const sendReply = useCallback(async () => {
-    if (!reply.trim()) return;
-    const userMsg = reply.trim();
-    setReply("");
-    const newConv = [...conversation, { role: "user" as const, text: userMsg }];
-    setConversation(newConv);
+  const callAvis = useCallback(async (conv: { role: "user" | "agent"; text: string }[], currentInputs: Inputs, currentResults: Results | null) => {
     setAvisLoading(true);
     try {
       const res = await fetch("/api/lmnp/avis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inputs, results, loyerInfo, conversation: newConv }),
+        body: JSON.stringify({ inputs: currentInputs, results: currentResults, loyerInfo, conversation: conv }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -362,8 +357,24 @@ export default function LMNPPage() {
     } finally {
       setAvisLoading(false);
     }
+  }, [loyerInfo]);
+
+  const sendReply = useCallback(async () => {
+    if (!reply.trim()) return;
+    const userMsg = reply.trim();
+    setReply("");
+    const newConv = [...conversation, { role: "user" as const, text: userMsg }];
+    setConversation(newConv);
+    await callAvis(newConv, inputs, results);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reply, conversation, inputs, results, loyerInfo]);
+  }, [reply, conversation, inputs, results, callAvis]);
+
+  const refreshAnalysis = useCallback(async () => {
+    const msg = "Les chiffres ont changé (travaux, loyer ou autres paramètres mis à jour). Refais une analyse complète avec les nouvelles données du dossier.";
+    const newConv = [...conversation, { role: "user" as const, text: msg }];
+    setConversation(newConv);
+    await callAvis(newConv, inputs, results);
+  }, [conversation, inputs, results, callAvis]);
 
   const verdict = results
     ? results.rendementNet >= 7
@@ -764,12 +775,21 @@ export default function LMNPPage() {
                     </div>
                   )}
 
-                  <button
-                    onClick={() => { setConversation([]); setContexte(""); setReply(""); }}
-                    style={{ alignSelf: "flex-start", fontSize: 12, color: "#aaa", background: "none", border: "none", cursor: "pointer", padding: 0 }}
-                  >
-                    ↺ Recommencer la conversation
-                  </button>
+                  <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                    <button
+                      onClick={refreshAnalysis}
+                      disabled={avisLoading}
+                      style={{ fontSize: 12, color: BLUE, background: "none", border: `1px solid ${BLUE}40`, borderRadius: 8, cursor: "pointer", padding: "4px 10px", fontWeight: 600 }}
+                    >
+                      🔄 Relancer l&apos;analyse avec les nouveaux chiffres
+                    </button>
+                    <button
+                      onClick={() => { setConversation([]); setContexte(""); setReply(""); }}
+                      style={{ fontSize: 12, color: "#aaa", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                    >
+                      ↺ Recommencer
+                    </button>
+                  </div>
                 </div>
               )}
             </section>
