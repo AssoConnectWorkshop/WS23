@@ -554,6 +554,7 @@ export default function LMNPPage() {
   const [cfDetailOpen, setCfDetailOpen] = useState(false);
   const [lectureOpen, setLectureOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [tauxManuel, setTauxManuel] = useState(false);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 900);
@@ -562,7 +563,14 @@ export default function LMNPPage() {
     return () => window.removeEventListener("resize", check);
   }, []);
 
+  useEffect(() => {
+    if (!tauxManuel) {
+      setInputs(prev => ({ ...prev, taux: tauxMarche(prev.duree, prev.apport) }));
+    }
+  }, [inputs.duree, inputs.apport, tauxManuel]);
+
   const set = useCallback((key: keyof Inputs, val: number | string) => {
+    if (key === "taux") setTauxManuel(true);
     setInputs(prev => ({ ...prev, [key]: val }));
   }, []);
 
@@ -969,13 +977,13 @@ export default function LMNPPage() {
               <div>
                 <Field label="Taux crédit" value={inputs.taux} onChange={v => set("taux", v)} unit="%" step={0.05} />
                 <button
-                  onClick={() => set("taux", suggere)}
+                  onClick={() => { setTauxManuel(false); set("taux", suggere); }}
                   style={{
                     marginTop: 6, padding: "3px 10px", borderRadius: 6, fontSize: 11,
                     background: BLUE_LIGHT, color: BLUE, border: "none", cursor: "pointer", fontWeight: 600,
                   }}
                 >
-                  Marché suggéré: {suggere}% — appliquer
+                  {tauxManuel ? `Revenir au marché : ${suggere}%` : `Taux marché auto : ${suggere}%`}
                 </button>
               </div>
               <Field label="Durée" value={inputs.duree} onChange={v => set("duree", v)} unit="ans" step={1} />
