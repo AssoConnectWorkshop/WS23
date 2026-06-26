@@ -483,30 +483,33 @@ export default function LMNPPage() {
   }, [conversation, inputs, results, callAvis]);
 
   const integrateAndRefresh = useCallback(async () => {
-    const allAgent = conversation.filter(m => m.role === "agent").map(m => m.text).join("\n");
+    // Parse PARAMÈTRES À RÉVISER section from last agent message
+    const lastAgent = [...conversation].reverse().find(m => m.role === "agent")?.text ?? "";
     const updated: Partial<Inputs> = {};
 
-    // Travaux
-    const travauxM = allAgent.match(/(?:budget\s+travaux[^:]*:|travaux[^:]*estimé[^:]*:)\s*[\*~]*([\d\s]+(?:\s*000)?)\s*€/i);
-    if (travauxM) { const v = parseInt(travauxM[1].replace(/\s/g, "")); if (v >= 1000) updated.travaux = v; }
+    // Parse structured block: **PARAMÈTRES À RÉVISER** : loyer → 650 €/mois | travaux → 20 000 €
+    const block = lastAgent.match(/PARAMÈTRES\s+[ÀA]\s+RÉVISER[^:\n]*:?\s*([^\n]+)/i)?.[1] ?? lastAgent;
 
-    // Loyer révisé
-    const loyerM = allAgent.match(/loyer[^:*\n]*:\s*\*{0,2}([\d\s]+)\s*€\/mois/i)
-      || allAgent.match(/([\d\s]{3,6})\s*€\/mois\s+(?:de\s+)?loyer/i)
-      || allAgent.match(/loyer\s+(?:potentiel|réaliste|estimé)[^\d]*([\d\s]{3,6})\s*€/i);
+    const loyerM = block.match(/loyer\s*[→:]\s*([\d\s]+)\s*€/i);
     if (loyerM) { const v = parseInt(loyerM[1].replace(/\s/g, "")); if (v >= 200 && v <= 10000) updated.loyer = v; }
 
-    if (Object.keys(updated).length > 0) {
-      setInputs(prev => ({ ...prev, ...updated }));
-    }
+    const travauxM = block.match(/travaux\s*[→:]\s*([\d\s]+)\s*€/i)
+      || lastAgent.match(/Budget\s+travaux\s+estimé\s*:\s*([\d\s]+)\s*€/i);
+    if (travauxM) { const v = parseInt(travauxM[1].replace(/\s/g, "")); if (v >= 1000) updated.travaux = v; }
+
+    const tauxM = block.match(/taux\s*[→:]\s*([\d,.]+)\s*%/i);
+    if (tauxM) { const v = parseFloat(tauxM[1].replace(",", ".")); if (v >= 1 && v <= 10) updated.taux = v; }
+
+    if (Object.keys(updated).length > 0) setInputs(prev => ({ ...prev, ...updated }));
 
     const items = [
-      updated.travaux ? `travaux révisés à ${updated.travaux.toLocaleString("fr-FR")} €` : null,
-      updated.loyer ? `loyer révisé à ${updated.loyer} €/mois` : null,
+      updated.loyer ? `loyer → ${updated.loyer} €/mois` : null,
+      updated.travaux ? `travaux → ${updated.travaux.toLocaleString("fr-FR")} €` : null,
+      updated.taux ? `taux → ${updated.taux}%` : null,
     ].filter(Boolean);
     const msg = items.length > 0
-      ? `J'ai intégré les hypothèses révisées (${items.join(", ")}). Refais une analyse complète à jour.`
-      : "Refais une analyse complète en tenant compte de tout ce qu'on a discuté.";
+      ? `OK, j'intègre : ${items.join(", ")}. Refais l'analyse complète avec ces chiffres.`
+      : "Refais l'analyse complète en tenant compte de tout ce qu'on a discuté.";
     const newConv = [...conversation, { role: "user" as const, text: msg }];
     setConversation(newConv);
     const nextInputs = { ...inputs, ...updated };
@@ -1095,10 +1098,13 @@ export default function LMNPPage() {
               @media print {
                 .no-print { display: none !important; }
                 .print-only { display: block !important; }
-                body { background: white !important; margin: 0; }
-                main > *:not(.print-only) { display: none !important; }
-                main { padding: 0 !important; background: white !important; max-width: 100% !important; }
-                .print-only { padding: 28px 32px; max-width: 800px; margin: 0 auto; }
+                body * { visibility: hidden; }
+                .print-only, .print-only * { visibility: visible; }
+                .print-only {
+                  position: fixed; top: 0; left: 0; width: 100%;
+                  padding: 28px 40px; box-sizing: border-box;
+                  background: white; overflow: visible;
+                }
                 * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
               }
             `}</style>

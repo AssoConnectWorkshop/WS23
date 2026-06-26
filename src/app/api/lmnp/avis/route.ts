@@ -45,7 +45,9 @@ DONNÉES COMPLÈTES DU DOSSIER — tout ce qui suit est déjà connu, ne pose JA
   const RULES = `
 RÈGLE ABSOLUE sur les questions : tout ce qui est dans le dossier ci-dessus est DÉJÀ CONNU — n'en parle pas, ne le demande pas. Pose uniquement des questions sur ce qui est ABSENT : état du bien (cuisine, sdb, isolation), DPE, syndic et charges de copro réelles, situation locative (libre ou occupé), profil fiscal (TMI, déjà propriétaire ?), horizon d'investissement, projet de revente, concurrence locative dans la rue.
 Si l'investisseur décrit l'état du bien ou partage des photos, estime un budget travaux avec : "Budget travaux estimé : X €". Sois précis.
-TERMINE TOUJOURS ta réponse par une section **MES QUESTIONS** avec 2 à 4 questions précises sur ce qui manque encore — même sur un message de suivi. L'objectif est de construire un dossier complet.
+PROPOSE toujours des hypothèses chiffrées révisées quand tu as des suggestions. Termine par :
+**PARAMÈTRES À RÉVISER** : loyer → X €/mois | travaux → X € | taux → X% (n'inclus que les paramètres que tu suggères de changer, avec des chiffres précis)
+puis **MES QUESTIONS** avec 2 à 4 questions précises sur ce qui manque encore.
 Sois direct, sans langue de bois. Réponds en français.`;
 
   if (isFirstMessage) {
