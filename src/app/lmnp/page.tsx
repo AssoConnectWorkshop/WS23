@@ -251,6 +251,7 @@ export default function LMNPPage() {
   const [conversation, setConversation] = useState<{ role: "user" | "agent"; text: string }[]>([]);
   const [reply, setReply] = useState("");
   const [avisLoading, setAvisLoading] = useState(false);
+  const [etatBien, setEtatBien] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const set = useCallback((key: keyof Inputs, val: number | string) => {
@@ -326,7 +327,9 @@ export default function LMNPPage() {
         surface: data.surface || prev.surface,
         ville: data.ville || prev.ville,
         loyer: data.loyerEstime || prev.loyer,
+        travaux: data.travauxEstime != null && data.travauxEstime > 0 ? data.travauxEstime : prev.travaux,
       }));
+      if (data.etatBien) setEtatBien(data.etatBien);
       setParsed(true);
     } catch (e) {
       setError((e as Error).message);
@@ -518,7 +521,14 @@ export default function LMNPPage() {
               setInputs(prev => ({ ...prev, surface: v }));
             }} unit="m²" />
             <Field label="Loyer mensuel estimé" value={inputs.loyer} onChange={v => set("loyer", v)} />
-            <Field label="Budget travaux" value={inputs.travaux} onChange={v => set("travaux", v)} step={500} />
+            <div>
+              <Field label="Budget travaux" value={inputs.travaux} onChange={v => set("travaux", v)} step={500} />
+              {etatBien && (
+                <p style={{ marginTop: 6, fontSize: 12, color: "#888", fontStyle: "italic" }}>
+                  🔍 {etatBien}
+                </p>
+              )}
+            </div>
           </div>
           {loyerInfo && inputs.loyer > 0 && (
             <p style={{ marginTop: 12, fontSize: 13, color: "#888" }}>
@@ -695,6 +705,20 @@ export default function LMNPPage() {
                         color: "#1a1a2e",
                       }}>
                         {msg.text}
+                        {msg.role === "agent" && (() => {
+                          const m = msg.text.match(/(?:budget\s+travaux[^:]*:|travaux[^:]*estimé[^:]*:)\s*[\*~]*([\d\s]+(?:\s*000)?)\s*€/i);
+                          if (!m) return null;
+                          const montant = parseInt(m[1].replace(/\s/g, ""));
+                          if (!montant || montant < 1000) return null;
+                          return (
+                            <button
+                              onClick={() => { set("travaux", montant); setEtatBien(`Estimé par l'agent : ${montant.toLocaleString("fr-FR")} €`); }}
+                              style={{ marginTop: 10, display: "block", padding: "6px 14px", borderRadius: 8, border: `1.5px solid ${BLUE}`, background: "white", color: BLUE, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+                            >
+                              ✏️ Appliquer {montant.toLocaleString("fr-FR")} € de travaux
+                            </button>
+                          );
+                        })()}
                       </div>
                     </div>
                   ))}

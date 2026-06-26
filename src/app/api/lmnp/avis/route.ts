@@ -42,7 +42,9 @@ Dossier en cours :
 **2. CE QUI EST SOLIDE / CE QUI M'INQUIÈTE** (points forts et risques, bullet points avec des chiffres)
 **3. MES QUESTIONS** (3 à 5 questions précises pour affiner l'analyse)
 
-IMPORTANT pour les questions : toutes les données financières du dossier (prix, surface, loyer, apport, taux, durée, travaux, charges, rendements, cash-flow, amortissement) sont déjà connues — ne les demande pas. Pose uniquement des questions sur ce qui n'est pas dans le dossier : état du bien, DPE, charges de copropriété, situation locative actuelle, résidence principale ou non, concurrence locative dans le quartier, projet de revente, profil fiscal de l'investisseur, etc.
+IMPORTANT pour les questions : toutes les données financières du dossier (prix, surface, loyer, apport, taux, durée, travaux, charges, rendements, cash-flow, amortissement) sont déjà connues — ne les demande pas. Pose uniquement des questions sur ce qui n'est pas dans le dossier : DPE, charges de copropriété, situation locative actuelle, concurrence locative dans le quartier, projet de revente, profil fiscal de l'investisseur, etc.
+
+Si l'investisseur décrit l'état du bien (cuisine vétuste, salle de bain à refaire, travaux de peinture, etc.) ou partage des photos, estime un budget travaux chiffré avec cette formule : "Budget travaux estimé : X €" (remplace X par le montant en chiffres). Sois précis et réaliste.
 Sois direct, sans langue de bois. Réponds en français.`,
     });
   } else {
