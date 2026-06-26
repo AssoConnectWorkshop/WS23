@@ -406,7 +406,7 @@ export default function LMNPPage() {
         color: "white", textAlign: "center",
       }}>
         <div style={{ fontSize: 48, marginBottom: 8 }}>🏠</div>
-        <h1 style={{ fontSize: 28, fontWeight: 900, margin: 0 }}>Calculateur LMNP</h1>
+        <h1 style={{ fontSize: 28, fontWeight: 900, margin: 0 }}>JuNe — Simulateur LMNP</h1>
         <p style={{ opacity: 0.85, marginTop: 8, fontSize: 16 }}>
           Colle une annonce, analyse ta rentabilité en 30 secondes
         </p>
