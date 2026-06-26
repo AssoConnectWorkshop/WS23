@@ -220,6 +220,97 @@ function AddressAutocomplete({ surface, onSelect }: {
   );
 }
 
+function AgentMessage({ text, onApplyTravaux, blue }: { text: string; onApplyTravaux: (m: number) => void; blue: string }) {
+  const travaux = (() => {
+    const m = text.match(/(?:budget\s+travaux[^:]*:|travaux[^:]*estimé[^:]*:)\s*[\*~]*([\d\s]+(?:\s*000)?)\s*€/i);
+    if (!m) return null;
+    const n = parseInt(m[1].replace(/\s/g, ""));
+    return n >= 1000 ? n : null;
+  })();
+
+  const lines = text.split("\n");
+  const nodes: React.ReactNode[] = [];
+
+  const renderInline = (s: string, key: number): React.ReactNode => {
+    const parts = s.split(/(\*\*[^*]+\*\*)/g);
+    return (
+      <span key={key}>
+        {parts.map((p, i) =>
+          p.startsWith("**") && p.endsWith("**")
+            ? <strong key={i} style={{ fontWeight: 700, color: "#0f172a" }}>{p.slice(2, -2)}</strong>
+            : p
+        )}
+      </span>
+    );
+  };
+
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    // Section heading (e.g. **1. TON VERDICT**)
+    const headingMatch = line.match(/^\*\*(\d+\.\s*.+?)\*\*\s*$/) || line.match(/^#+\s*(.+)$/);
+    if (headingMatch) {
+      const label = headingMatch[1];
+      const accent = label.toLowerCase().includes("solid") || label.toLowerCase().includes("point") ? "#10b981"
+        : label.toLowerCase().includes("inqui") || label.toLowerCase().includes("risque") ? "#f59e0b"
+        : label.toLowerCase().includes("question") ? blue
+        : blue;
+      nodes.push(
+        <div key={i} style={{ marginTop: i > 0 ? 18 : 0, marginBottom: 6, display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 3, height: 16, borderRadius: 2, background: accent, flexShrink: 0 }} />
+          <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: accent }}>{label}</span>
+        </div>
+      );
+      i++; continue;
+    }
+    // Bullet
+    if (line.match(/^[-•]\s+/)) {
+      const bullets: string[] = [];
+      while (i < lines.length && lines[i].match(/^[-•]\s+/)) {
+        bullets.push(lines[i].replace(/^[-•]\s+/, ""));
+        i++;
+      }
+      nodes.push(
+        <ul key={`ul-${i}`} style={{ margin: "6px 0", paddingLeft: 20, display: "flex", flexDirection: "column", gap: 4 }}>
+          {bullets.map((b, bi) => (
+            <li key={bi} style={{ fontSize: 14, lineHeight: 1.65, color: "#334155", listStyleType: "disc" }}>{renderInline(b, bi)}</li>
+          ))}
+        </ul>
+      );
+      continue;
+    }
+    // Numbered list
+    if (line.match(/^\d+\.\s+/)) {
+      nodes.push(<p key={i} style={{ margin: "4px 0", fontSize: 14, lineHeight: 1.65, color: "#334155" }}>{renderInline(line, i)}</p>);
+      i++; continue;
+    }
+    // Empty line
+    if (line.trim() === "") { nodes.push(<div key={i} style={{ height: 6 }} />); i++; continue; }
+    // Normal
+    nodes.push(<p key={i} style={{ margin: "3px 0", fontSize: 14, lineHeight: 1.7, color: "#334155" }}>{renderInline(line, i)}</p>);
+    i++;
+  }
+
+  return (
+    <div>
+      {nodes}
+      {travaux && (
+        <button
+          onClick={() => onApplyTravaux(travaux)}
+          style={{
+            marginTop: 14, display: "inline-flex", alignItems: "center", gap: 6,
+            padding: "7px 14px", borderRadius: 9, border: `1.5px solid ${blue}`,
+            background: `${blue}08`, color: blue, fontSize: 13, fontWeight: 600, cursor: "pointer",
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={blue} strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          Appliquer {travaux.toLocaleString("fr-FR")} € de travaux
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function LMNPPage() {
   const [inputs, setInputs] = useState<Inputs>({
     annonce: "",
@@ -643,156 +734,213 @@ export default function LMNPPage() {
             </section>
 
             {/* Avis agent — chat */}
-            <section style={{ background: "white", borderRadius: 20, padding: 24, boxShadow: "0 2px 16px rgba(0,0,0,0.07)", border: `1.5px solid ${BLUE}20` }}>
-              <h2 style={{ fontSize: 16, fontWeight: 700, color: BLUE, marginBottom: 4 }}>🧑‍💼 L&apos;avis de l&apos;agent</h2>
-              <p style={{ fontSize: 13, color: "#888", marginBottom: 14 }}>
-                Décris le bien, le quartier, ton projet… L&apos;agent analyse et peut te poser des questions.
-              </p>
+            <section style={{ background: "white", borderRadius: 20, overflow: "hidden", boxShadow: "0 2px 20px rgba(30,79,204,0.08)", border: `1px solid ${BLUE}18` }}>
+              {/* Header */}
+              <div style={{ padding: "18px 24px 16px", borderBottom: `1px solid #EEF2FF`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{
+                    width: 38, height: 38, borderRadius: 12, flexShrink: 0,
+                    background: `linear-gradient(135deg, ${BLUE} 0%, #6366f1 100%)`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontWeight: 800, fontSize: 13, color: "white", letterSpacing: "0.02em",
+                  }}>JN</div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 15, color: "#0f172a" }}>Agent expert LMNP</div>
+                    <div style={{ fontSize: 12, color: "#94a3b8" }}>Analyse ton dossier · pose des questions · estime les travaux</div>
+                  </div>
+                </div>
+                {conversation.length > 0 && (
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      onClick={refreshAnalysis}
+                      disabled={avisLoading}
+                      title="Relancer l'analyse avec les chiffres actuels"
+                      style={{ fontSize: 12, color: BLUE, background: `${BLUE}0D`, border: `1px solid ${BLUE}30`, borderRadius: 8, cursor: avisLoading ? "default" : "pointer", padding: "5px 11px", fontWeight: 600, opacity: avisLoading ? 0.5 : 1 }}
+                    >↻ Actualiser</button>
+                    <button
+                      onClick={() => { setConversation([]); setContexte(""); setReply(""); }}
+                      style={{ fontSize: 12, color: "#94a3b8", background: "none", border: "1px solid #e2e8f0", borderRadius: 8, cursor: "pointer", padding: "5px 11px" }}
+                    >Nouveau</button>
+                  </div>
+                )}
+              </div>
 
-              {/* Premier message si pas de conversation */}
+              {/* État initial */}
               {conversation.length === 0 && (
-                <>
-                  <textarea
-                    rows={4}
-                    value={contexte}
-                    onChange={e => setContexte(e.target.value)}
-                    placeholder="Ex : immeuble années 70, bon état général. Quartier en cours de gentrification. Je cherche à défiscaliser sur 10 ans…"
-                    style={{
-                      width: "100%", padding: "12px 14px", borderRadius: 12, fontSize: 14,
-                      border: "1.5px solid #C7D2FD", outline: "none", resize: "vertical",
-                      fontFamily: "inherit", lineHeight: 1.5, boxSizing: "border-box",
-                    }}
-                  />
-                  <button
-                    onClick={async () => {
-                      const userMsg = contexte.trim() || "(pas de contexte supplémentaire)";
-                      setConversation([{ role: "user", text: userMsg }]);
-                      setAvisLoading(true);
-                      try {
-                        const res = await fetch("/api/lmnp/avis", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ inputs, results, loyerInfo, conversation: [{ role: "user", text: userMsg }] }),
-                        });
-                        const data = await res.json();
-                        if (!res.ok) throw new Error(data.error);
-                        setConversation(prev => [...prev, { role: "agent", text: data.avis }]);
-                        setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
-                      } catch (e) {
-                        setConversation(prev => [...prev, { role: "agent", text: `⚠️ ${(e as Error).message}` }]);
-                      } finally {
-                        setAvisLoading(false);
-                      }
-                    }}
-                    disabled={avisLoading}
-                    style={{
-                      marginTop: 12, padding: "12px 24px", borderRadius: 12, fontSize: 15, fontWeight: 700,
-                      background: avisLoading ? "#e2e8f0" : `linear-gradient(135deg, ${BLUE}, #6366f1)`,
-                      color: avisLoading ? "#aaa" : "white", border: "none", cursor: avisLoading ? "default" : "pointer",
-                    }}
-                  >
-                    {avisLoading ? "⏳ Analyse en cours…" : "🧑‍💼 Demander l'avis de l'agent"}
-                  </button>
-                </>
+                <div style={{ padding: 24 }}>
+                  <p style={{ fontSize: 13, color: "#64748b", marginBottom: 14, lineHeight: 1.6 }}>
+                    Donne du contexte sur le bien : état général, DPE, charges de copro, ton objectif (défiscaliser, cash-flow, revente…). L&apos;agent analyse et creuse ce qui manque.
+                  </p>
+                  <div style={{ position: "relative" }}>
+                    <textarea
+                      rows={4}
+                      value={contexte}
+                      onChange={e => setContexte(e.target.value)}
+                      onKeyDown={async e => {
+                        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                          e.preventDefault();
+                          const userMsg = contexte.trim() || "(pas de contexte supplémentaire)";
+                          setConversation([{ role: "user", text: userMsg }]);
+                          setAvisLoading(true);
+                          try {
+                            const res = await fetch("/api/lmnp/avis", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ inputs, results, loyerInfo, conversation: [{ role: "user", text: userMsg }] }) });
+                            const data = await res.json();
+                            if (!res.ok) throw new Error(data.error);
+                            setConversation(prev => [...prev, { role: "agent", text: data.avis }]);
+                            setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+                          } catch (e) {
+                            setConversation(prev => [...prev, { role: "agent", text: `⚠️ ${(e as Error).message}` }]);
+                          } finally { setAvisLoading(false); }
+                        }
+                      }}
+                      placeholder="Ex : immeuble années 70, cuisine et sdb à refaire, charges de copro 180 €/mois, DPE D. Je cherche à défiscaliser sur 10 ans…"
+                      style={{
+                        width: "100%", padding: "14px 16px", paddingBottom: 48, borderRadius: 14, fontSize: 14,
+                        border: "1.5px solid #dde5ff", outline: "none", resize: "none",
+                        fontFamily: "inherit", lineHeight: 1.6, boxSizing: "border-box",
+                        color: "#0f172a", background: "#fafbff",
+                      }}
+                    />
+                    <button
+                      onClick={async () => {
+                        const userMsg = contexte.trim() || "(pas de contexte supplémentaire)";
+                        setConversation([{ role: "user", text: userMsg }]);
+                        setAvisLoading(true);
+                        try {
+                          const res = await fetch("/api/lmnp/avis", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ inputs, results, loyerInfo, conversation: [{ role: "user", text: userMsg }] }) });
+                          const data = await res.json();
+                          if (!res.ok) throw new Error(data.error);
+                          setConversation(prev => [...prev, { role: "agent", text: data.avis }]);
+                          setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+                        } catch (e) {
+                          setConversation(prev => [...prev, { role: "agent", text: `⚠️ ${(e as Error).message}` }]);
+                        } finally { setAvisLoading(false); }
+                      }}
+                      disabled={avisLoading}
+                      style={{
+                        position: "absolute", bottom: 10, right: 10,
+                        padding: "8px 18px", borderRadius: 10, fontSize: 13, fontWeight: 700,
+                        background: avisLoading ? "#e2e8f0" : `linear-gradient(135deg, ${BLUE}, #6366f1)`,
+                        color: avisLoading ? "#aaa" : "white", border: "none", cursor: avisLoading ? "default" : "pointer",
+                      }}
+                    >
+                      {avisLoading ? "Analyse…" : "Lancer l'analyse →"}
+                    </button>
+                  </div>
+                  <p style={{ marginTop: 10, fontSize: 11, color: "#b0bbcc" }}>⌘ + Entrée pour envoyer</p>
+                </div>
               )}
 
               {/* Fil de conversation */}
               {conversation.length > 0 && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                  {conversation.map((msg, i) => (
-                    <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start", flexDirection: msg.role === "user" ? "row-reverse" : "row" }}>
-                      <div style={{
-                        width: 36, height: 36, borderRadius: "50%", flexShrink: 0, fontSize: 18,
-                        background: msg.role === "agent" ? `linear-gradient(135deg, ${BLUE}, #6366f1)` : "#e2e8f0",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                      }}>
-                        {msg.role === "agent" ? "🧑‍💼" : "👤"}
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  <div style={{ maxHeight: 540, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+                    {conversation.map((msg, i) => (
+                      <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start", flexDirection: msg.role === "user" ? "row-reverse" : "row" }}>
+                        {msg.role === "agent" && (
+                          <div style={{
+                            width: 32, height: 32, borderRadius: 10, flexShrink: 0,
+                            background: `linear-gradient(135deg, ${BLUE}, #6366f1)`,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontWeight: 800, fontSize: 10, color: "white", letterSpacing: "0.02em",
+                          }}>JN</div>
+                        )}
+                        <div style={{
+                          maxWidth: msg.role === "user" ? "75%" : "100%",
+                          flex: msg.role === "agent" ? 1 : undefined,
+                        }}>
+                          {msg.role === "user" ? (
+                            <div style={{
+                              padding: "10px 16px", borderRadius: "18px 4px 18px 18px", fontSize: 14,
+                              background: `${BLUE}12`, border: `1px solid ${BLUE}25`,
+                              color: "#1e3a5f", lineHeight: 1.6, whiteSpace: "pre-wrap",
+                            }}>{msg.text === "(pas de contexte supplémentaire)" ? "— aucun contexte ajouté" : msg.text}</div>
+                          ) : (
+                            <div style={{
+                              padding: "16px 20px", borderRadius: "4px 18px 18px 18px", fontSize: 14,
+                              background: "#f8faff", border: "1px solid #e8eeff",
+                              color: "#1e293b", lineHeight: 1.75,
+                            }}>
+                              <AgentMessage text={msg.text} onApplyTravaux={(m) => { set("travaux", m); setEtatBien(`Estimé par l'agent : ${m.toLocaleString("fr-FR")} €`); }} blue={BLUE} />
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div style={{
-                        flex: 1, padding: "12px 16px", fontSize: 14, lineHeight: 1.7, whiteSpace: "pre-wrap",
-                        borderRadius: msg.role === "agent" ? "4px 16px 16px 16px" : "16px 4px 16px 16px",
-                        background: msg.role === "agent" ? "#F8FAFF" : "#EEF2FF",
-                        border: `1px solid ${msg.role === "agent" ? `${BLUE}20` : "#C7D2FD"}`,
-                        color: "#1a1a2e",
-                      }}>
-                        {msg.text}
-                        {msg.role === "agent" && (() => {
-                          const m = msg.text.match(/(?:budget\s+travaux[^:]*:|travaux[^:]*estimé[^:]*:)\s*[\*~]*([\d\s]+(?:\s*000)?)\s*€/i);
-                          if (!m) return null;
-                          const montant = parseInt(m[1].replace(/\s/g, ""));
-                          if (!montant || montant < 1000) return null;
-                          return (
-                            <button
-                              onClick={() => { set("travaux", montant); setEtatBien(`Estimé par l'agent : ${montant.toLocaleString("fr-FR")} €`); }}
-                              style={{ marginTop: 10, display: "block", padding: "6px 14px", borderRadius: 8, border: `1.5px solid ${BLUE}`, background: "white", color: BLUE, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
-                            >
-                              ✏️ Appliquer {montant.toLocaleString("fr-FR")} € de travaux
-                            </button>
-                          );
-                        })()}
+                    ))}
+
+                    {avisLoading && (
+                      <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                        <div style={{
+                          width: 32, height: 32, borderRadius: 10, flexShrink: 0,
+                          background: `linear-gradient(135deg, ${BLUE}, #6366f1)`,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontWeight: 800, fontSize: 10, color: "white",
+                        }}>JN</div>
+                        <div style={{ padding: "14px 18px", borderRadius: "4px 18px 18px 18px", background: "#f8faff", border: "1px solid #e8eeff", display: "flex", gap: 5, alignItems: "center" }}>
+                          {[0, 1, 2].map(d => (
+                            <span key={d} style={{
+                              width: 7, height: 7, borderRadius: "50%", background: BLUE, opacity: 0.3,
+                              animation: "dotpulse 1.2s ease-in-out infinite",
+                              animationDelay: `${d * 0.2}s`,
+                              display: "inline-block",
+                            }} />
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )}
+                    <div ref={chatEndRef} />
+                  </div>
 
-                  {avisLoading && (
-                    <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                      <div style={{
-                        width: 36, height: 36, borderRadius: "50%", fontSize: 18,
-                        background: `linear-gradient(135deg, ${BLUE}, #6366f1)`,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                      }}>🧑‍💼</div>
-                      <div style={{ fontSize: 13, color: "#888", fontStyle: "italic" }}>L&apos;agent rédige sa réponse…</div>
-                    </div>
-                  )}
-                  <div ref={chatEndRef} />
-
-                  {/* Champ réponse */}
-                  {!avisLoading && (
-                    <div style={{ display: "flex", gap: 10, alignItems: "flex-end", marginTop: 4 }}>
+                  {/* Barre de réponse */}
+                  <div style={{ borderTop: "1px solid #eef2ff", padding: "14px 20px", background: "#fafbff" }}>
+                    <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
                       <textarea
-                        rows={2}
+                        rows={1}
                         value={reply}
-                        onChange={e => setReply(e.target.value)}
-                        onKeyDown={async e => {
-                          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (!reply.trim()) return; await sendReply(); }
+                        onChange={e => {
+                          setReply(e.target.value);
+                          e.target.style.height = "auto";
+                          e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
                         }}
-                        placeholder="Réponds aux questions de l'agent… (Entrée pour envoyer)"
+                        onKeyDown={async e => {
+                          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (!reply.trim() || avisLoading) return; await sendReply(); }
+                        }}
+                        disabled={avisLoading}
+                        placeholder="Réponds à l'agent… (Entrée pour envoyer, Maj+Entrée pour aller à la ligne)"
                         style={{
                           flex: 1, padding: "10px 14px", borderRadius: 12, fontSize: 14,
-                          border: "1.5px solid #C7D2FD", outline: "none", resize: "none",
-                          fontFamily: "inherit", lineHeight: 1.5,
+                          border: "1.5px solid #dde5ff", outline: "none", resize: "none", overflow: "hidden",
+                          fontFamily: "inherit", lineHeight: 1.5, background: "white", color: "#0f172a",
+                          minHeight: 42, transition: "border-color 0.15s",
                         }}
                       />
                       <button
                         onClick={sendReply}
-                        disabled={!reply.trim()}
+                        disabled={!reply.trim() || avisLoading}
                         style={{
-                          padding: "10px 18px", borderRadius: 12, fontSize: 22, border: "none",
-                          background: reply.trim() ? `linear-gradient(135deg, ${BLUE}, #6366f1)` : "#e2e8f0",
-                          cursor: reply.trim() ? "pointer" : "default", flexShrink: 0,
+                          width: 42, height: 42, borderRadius: 12, border: "none", flexShrink: 0,
+                          background: reply.trim() && !avisLoading ? `linear-gradient(135deg, ${BLUE}, #6366f1)` : "#e8eeff",
+                          cursor: reply.trim() && !avisLoading ? "pointer" : "default",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          transition: "background 0.15s",
                         }}
-                      >➤</button>
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                          <path d="M22 2L11 13" stroke={reply.trim() && !avisLoading ? "white" : "#94a3b8"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke={reply.trim() && !avisLoading ? "white" : "#94a3b8"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
                     </div>
-                  )}
-
-                  <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                    <button
-                      onClick={refreshAnalysis}
-                      disabled={avisLoading}
-                      style={{ fontSize: 12, color: BLUE, background: "none", border: `1px solid ${BLUE}40`, borderRadius: 8, cursor: "pointer", padding: "4px 10px", fontWeight: 600 }}
-                    >
-                      🔄 Relancer l&apos;analyse avec les nouveaux chiffres
-                    </button>
-                    <button
-                      onClick={() => { setConversation([]); setContexte(""); setReply(""); }}
-                      style={{ fontSize: 12, color: "#aaa", background: "none", border: "none", cursor: "pointer", padding: 0 }}
-                    >
-                      ↺ Recommencer
-                    </button>
                   </div>
                 </div>
               )}
             </section>
+            <style>{`
+              @keyframes dotpulse {
+                0%, 80%, 100% { opacity: 0.2; transform: scale(0.85); }
+                40% { opacity: 1; transform: scale(1); }
+              }
+            `}</style>
 
             {/* Grille de lecture */}
             <section style={{ background: "white", borderRadius: 20, padding: 24, boxShadow: "0 2px 16px rgba(0,0,0,0.07)", border: `1px solid #e2e8f0` }}>
