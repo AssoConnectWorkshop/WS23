@@ -188,7 +188,7 @@ function AddressAutocomplete({ surface, onSelect }: {
         value={query}
         onChange={e => search(e.target.value)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
-        placeholder="Ex : 12 rue de la Paix, Lyon 2..."
+        placeholder="Ex : Lyon 6e, Paris 11, Bordeaux Chartrons, Marseille 13008..."
         style={{ padding: "10px 12px", borderRadius: 10, fontSize: 15, border: "1.5px solid #C7D2FD", outline: "none" }}
       />
       {open && (

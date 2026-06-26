@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
 
   if (q.length < 3) return NextResponse.json([]);
 
-  const url = `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(q)}&limit=6&type=housenumber,street,municipality`;
+  const url = `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(q)}&limit=6`;
   const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
   if (!res.ok) return NextResponse.json([]);
 
