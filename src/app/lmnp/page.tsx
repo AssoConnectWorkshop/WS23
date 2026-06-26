@@ -145,6 +145,8 @@ interface AdresseSuggestion {
   loyerM2: number;
   loyerEstime: number;
   precision: string;
+  taxeFonciere: number;
+  assurancePNO: number;
 }
 
 function AddressAutocomplete({ surface, onSelect }: {
@@ -499,8 +501,14 @@ export default function LMNPPage() {
             <div style={{ gridColumn: "1/-1" }}>
               <AddressAutocomplete
                 surface={inputs.surface || 30}
-                onSelect={({ city, codePostal, loyerEstime: loyer, loyerM2, precision }) => {
-                  setInputs(prev => ({ ...prev, ville: city, loyer: prev.surface > 0 ? loyer : prev.loyer }));
+                onSelect={({ city, codePostal: _cp, loyerEstime: loyer, loyerM2, precision, taxeFonciere, assurancePNO }) => {
+                  setInputs(prev => ({
+                    ...prev,
+                    ville: city,
+                    loyer: prev.surface > 0 ? loyer : prev.loyer,
+                    taxeFonciere,
+                    assurancePNO,
+                  }));
                   setLoyerInfo({ loyerM2, precision, city });
                 }}
               />

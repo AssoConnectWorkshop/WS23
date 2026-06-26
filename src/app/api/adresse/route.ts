@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
       const codePostal = String(props.postcode ?? "");
       const citycode = String(props.citycode ?? "");
       const city = String(props.city ?? props.label ?? "");
-      const { loyerM2, precision } = estimerLoyerParAdresse({ codePostal, citycode, city, surface });
+      const { loyerM2, precision, taxeFonciere, assurancePNO } = estimerLoyerParAdresse({ codePostal, citycode, city, surface });
       return {
         label: props.label,
         city,
@@ -28,6 +28,8 @@ export async function GET(req: NextRequest) {
         loyerM2,
         loyerEstime: Math.round(loyerM2 * surface),
         precision,
+        taxeFonciere,
+        assurancePNO,
       };
     })
   );
