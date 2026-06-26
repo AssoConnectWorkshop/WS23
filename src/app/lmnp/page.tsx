@@ -432,6 +432,8 @@ export default function LMNPPage() {
         ville: data.ville || prev.ville,
         loyer: data.loyerEstime || prev.loyer,
         travaux: data.travauxEstime != null && data.travauxEstime > 0 ? data.travauxEstime : prev.travaux,
+        taxeFonciere: data.taxeFonciere != null && data.taxeFonciere > 0 ? data.taxeFonciere : prev.taxeFonciere,
+        // chargesCopro is monthly → annualize and add to charges% approximation is impractical; store as taxeFonciere override only
       }));
       if (data.etatBien) setEtatBien(data.etatBien);
       setParsed(true);

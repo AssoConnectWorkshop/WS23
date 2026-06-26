@@ -20,6 +20,8 @@ export interface ParsedListing {
   loyerM2: number;
   travauxEstime?: number;
   etatBien?: string;
+  taxeFonciere?: number;
+  chargesCopro?: number;
 }
 
 function estimerLoyer(ville: string, surface: number, codePostal?: string): { loyer: number; loyerM2: number } {
@@ -116,7 +118,7 @@ async function fetchListingText(url: string): Promise<string> {
   return res.text();
 }
 
-async function extractFromImages(images: string[]): Promise<{ prix: number; surface: number; ville: string; nbPieces: number; estNeuf: boolean; codePostal: string; travauxEstime: number; etatBien: string }> {
+async function extractFromImages(images: string[]): Promise<{ prix: number; surface: number; ville: string; nbPieces: number; estNeuf: boolean; codePostal: string; travauxEstime: number; etatBien: string; taxeFonciere: number; chargesCopro: number; loyer: number }> {
   if (!anthropic) throw new Error("Clé API Anthropic manquante — configure ANTHROPIC_API_KEY sur Vercel");
 
   const imageContent: Anthropic.ImageBlockParam[] = images.map((b64) => {
@@ -130,7 +132,7 @@ async function extractFromImages(images: string[]): Promise<{ prix: number; surf
 
   const msg = await anthropic.messages.create({
     model: "claude-haiku-4-5-20251001",
-    max_tokens: 768,
+    max_tokens: 900,
     messages: [{
       role: "user",
       content: [
@@ -138,15 +140,18 @@ async function extractFromImages(images: string[]): Promise<{ prix: number; surf
         {
           type: "text",
           text: `Tu vois des screenshots d'une annonce immobilière française. Extrais en JSON strict (pas de markdown) :
-{"prix":0,"surface":0,"ville":"","codePostal":"","nbPieces":1,"estNeuf":false,"travauxEstime":0,"etatBien":""}
+{"prix":0,"surface":0,"ville":"","codePostal":"","nbPieces":1,"estNeuf":false,"travauxEstime":0,"etatBien":"","taxeFonciere":0,"chargesCopro":0,"loyer":0}
 - prix : prix de vente en euros (entier, 0 si absent)
 - surface : m² (entier)
 - ville : nom de la ville
 - codePostal : code postal 5 chiffres ou ""
 - nbPieces : nombre de pièces (1 si studio)
 - estNeuf : true si neuf/VEFA
-- travauxEstime : budget travaux en euros estimé d'après l'état visible du bien (cuisine, salle de bain, sols, murs, menuiseries). 0 si état impeccable/rénové. Sois réaliste : rénovation légère 5 000-15 000€, partielle 15 000-40 000€, complète 40 000-80 000€+
-- etatBien : description courte de l'état en 1 phrase (ex: "Cuisine et sdb à refaire, parquet en bon état" ou "Bien entièrement rénové, aucun travaux nécessaire")`,
+- travauxEstime : budget travaux estimé d'après l'état visible (0 si rénové). Rénovation légère 5 000-15 000€, partielle 15 000-40 000€, complète 40 000-80 000€+
+- etatBien : description de l'état en 1 phrase courte
+- taxeFonciere : montant annuel de la taxe foncière en euros si mentionné dans l'annonce, sinon 0
+- chargesCopro : charges de copropriété mensuelles en euros si mentionnées (ex: "charges : 180 €/mois"), sinon 0
+- loyer : loyer mensuel en euros si l'annonce est une location ou si un loyer potentiel est mentionné, sinon 0`,
         },
       ],
     }],
@@ -163,6 +168,9 @@ async function extractFromImages(images: string[]): Promise<{ prix: number; surf
     estNeuf: Boolean(parsed.estNeuf),
     travauxEstime: parsed.travauxEstime || 0,
     etatBien: parsed.etatBien || "",
+    taxeFonciere: parsed.taxeFonciere || 0,
+    chargesCopro: parsed.chargesCopro || 0,
+    loyer: parsed.loyer || 0,
   };
 }
 
@@ -193,6 +201,8 @@ export async function POST(req: NextRequest) {
       loyerM2,
       travauxEstime: extracted.travauxEstime,
       etatBien: extracted.etatBien,
+      taxeFonciere: extracted.taxeFonciere || undefined,
+      chargesCopro: extracted.chargesCopro || undefined,
     } satisfies ParsedListing);
   }
 
