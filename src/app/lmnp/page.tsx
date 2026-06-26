@@ -773,6 +773,38 @@ export default function LMNPPage() {
               </div>
             </section>
 
+            {/* Détail du cash flow mensuel */}
+            <section style={cardStyle}>
+              <SectionHeader label="Détail du cash flow mensuel" />
+              <div style={{ display: "flex", flexDirection: "column", gap: 0, fontSize: 14, fontVariantNumeric: "tabular-nums" }}>
+                {[
+                  { label: "Loyer brut", value: inputs.loyer, sign: "+", color: GREEN, bold: false },
+                  { label: `Vacance locative (${inputs.vacance}%)`, value: -Math.round(inputs.loyer * inputs.vacance / 100), sign: "", color: RED, muted: true },
+                  { label: `Charges & gestion (${inputs.charges}% du loyer)`, value: -Math.round(inputs.loyer * inputs.charges / 100), sign: "", color: RED, muted: true },
+                  { label: `Taxe foncière (${fmt(inputs.taxeFonciere)} €/an)`, value: -Math.round(inputs.taxeFonciere / 12), sign: "", color: RED, muted: true },
+                  { label: `Expert-comptable (${fmt(inputs.expertComptable)} €/an)`, value: -Math.round(inputs.expertComptable / 12), sign: "", color: RED, muted: true },
+                  { label: `Assurance PNO (${fmt(inputs.assurancePNO)} €/an)`, value: -Math.round(inputs.assurancePNO / 12), sign: "", color: RED, muted: true },
+                  { label: "= Loyer net encaissé", value: Math.round(results.loyerNetMensuel), sign: results.loyerNetMensuel >= 0 ? "=" : "=", color: results.loyerNetMensuel >= 0 ? GREEN : ORANGE, bold: true, separator: true },
+                  { label: `Mensualité crédit (${inputs.taux}% / ${inputs.duree} ans)`, value: -Math.round(results.mensualiteCredit), sign: "", color: RED, muted: true },
+                  { label: "= Cash flow mensuel", value: Math.round(results.cashFlowMensuel), sign: results.cashFlowMensuel >= 0 ? "+" : "", color: results.cashFlowMensuel >= -400 ? GREEN : RED, bold: true, separator: true, big: true },
+                ].map((row, i) => (
+                  <div key={i} style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    padding: row.big ? "12px 14px" : "8px 14px",
+                    marginTop: row.separator ? 6 : 0,
+                    borderTop: row.separator ? `1px solid #E5EAFF` : "none",
+                    borderRadius: row.big ? 10 : 0,
+                    background: row.big ? `${row.color}08` : "transparent",
+                  }}>
+                    <span style={{ color: row.bold ? "#111827" : "#6B7280", fontWeight: row.bold ? 600 : 400, fontSize: row.big ? 15 : 13 }}>{row.label}</span>
+                    <span style={{ color: row.color, fontWeight: row.bold ? 800 : 500, fontSize: row.big ? 18 : 14 }}>
+                      {row.value >= 0 && row.sign ? row.sign : ""}{fmt(row.value)} €
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </section>
+
             {/* Avantage LMNP */}
             <section style={cardStyle}>
               <SectionHeader label="Avantage fiscal LMNP — régime réel" color={GREEN} />
@@ -1007,10 +1039,17 @@ export default function LMNPPage() {
                 0%, 80%, 100% { opacity: 0.2; transform: scale(0.85); }
                 40% { opacity: 1; transform: scale(1); }
               }
+              @media print {
+                .no-print { display: none !important; }
+                body { background: white !important; }
+                main { padding: 0 !important; background: white !important; }
+                section, div[style*="border-radius"] { box-shadow: none !important; border-color: #e5e7eb !important; break-inside: avoid; }
+                * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+              }
             `}</style>
 
             {/* Grille de lecture */}
-            <section style={cardStyle}>
+            <section style={cardStyle} className="no-print">
               <SectionHeader label="Grille de lecture" />
               {[
                 { seuil: "≥ 7%", label: "Top deal", desc: "Cash flow positif probable, forte rentabilité", color: GREEN },
@@ -1025,6 +1064,28 @@ export default function LMNPPage() {
                 </div>
               ))}
             </section>
+
+            {/* Export PDF */}
+            {conversation.length > 0 && (
+              <div style={{ textAlign: "center", paddingBottom: 8 }} className="no-print">
+                <button
+                  onClick={() => window.print()}
+                  style={{
+                    padding: "13px 32px", borderRadius: 12, fontSize: 15, fontWeight: 700,
+                    background: `linear-gradient(135deg, ${BLUE}, #6366f1)`,
+                    color: "white", border: "none", cursor: "pointer",
+                    display: "inline-flex", alignItems: "center", gap: 10,
+                  }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/>
+                    <rect x="6" y="14" width="12" height="8" rx="1"/>
+                  </svg>
+                  Télécharger l&apos;analyse en PDF
+                </button>
+                <p style={{ marginTop: 8, fontSize: 12, color: "#9CA3AF" }}>Dossier complet : chiffres + avis de l&apos;agent</p>
+              </div>
+            )}
           </>
         )}
 
