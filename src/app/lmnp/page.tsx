@@ -2,12 +2,12 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 
-const BLUE = "#1E4FCC";
-const TEAL = "#00C897";
-const BG = "#F4F6FB";
-const RED = "#e53e3e";
-const ORANGE = "#dd6b20";
-const GREEN = "#276749";
+const BLUE = "#2563EB";
+const TEAL = "#00B37D";
+const BG = "#EEF2FF";
+const RED = "#DC2626";
+const ORANGE = "#D97706";
+const GREEN = "#059669";
 
 // Taux immobilier moyen France juin 2026
 const DEFAULT_RATE = 3.6;
@@ -19,22 +19,18 @@ const DEFAULT_CHARGES = 15; // % du loyer (copro, taxe foncière, assurance, ges
 const DEFAULT_VACANCE = 5; // % du temps vacant
 
 function parseListingText(text: string) {
-  // Extrait prix
   const prixMatch = text.match(/(\d[\d\s]*)\s*€(?:\s*FAI)?(?:\s*\*)?/i) ||
     text.match(/prix[^:]*:\s*([\d\s]+)/i) ||
     text.match(/([\d\s]{5,})\s*euros?/i);
   const prix = prixMatch ? parseInt(prixMatch[1].replace(/\s/g, "")) : 0;
 
-  // Extrait surface
   const surfaceMatch = text.match(/(\d+)\s*m²/i) || text.match(/(\d+)\s*m2/i);
   const surface = surfaceMatch ? parseInt(surfaceMatch[1]) : 0;
 
-  // Extrait ville
   const villeMatch = text.match(/(?:à|situé[e]? à|commune de|ville de)\s+([A-ZÀ-Ü][a-zA-Zà-ü\-]+(?:\s[A-ZÀ-Ü][a-zA-Zà-ü\-]+)*)/i) ||
     text.match(/(\d{5})\s+([A-ZÀ-Ü][a-zA-Zà-ü\s\-]+)/);
   const ville = villeMatch ? (villeMatch[2] || villeMatch[1]).trim() : "";
 
-  // Extrait pièces
   const piecesMatch = text.match(/(\d+)\s*(?:pièces?|P|chambres?)/i);
   const pieces = piecesMatch ? parseInt(piecesMatch[1]) : 0;
 
@@ -42,9 +38,8 @@ function parseListingText(text: string) {
 }
 
 function loyerEstime(surface: number, ville: string): number {
-  // Loyers moyens au m² pour LMNP meublé (majorés ~20% vs nu)
   const villeNorm = ville.toLowerCase();
-  let prixM2 = 12; // défaut France
+  let prixM2 = 12;
   if (villeNorm.includes("paris")) prixM2 = 35;
   else if (["lyon", "marseille", "bordeaux", "nice"].some(v => villeNorm.includes(v))) prixM2 = 18;
   else if (["toulouse", "nantes", "montpellier", "strasbourg", "lille", "rennes"].some(v => villeNorm.includes(v))) prixM2 = 15;
@@ -58,6 +53,12 @@ function mensualiteCredit(capital: number, tauxAnnuel: number, dureeAns: number)
   const n = dureeAns * 12;
   if (r === 0) return capital / n;
   return (capital * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+}
+
+function tauxMarche(duree: number, apport: number): number {
+  const base = duree <= 10 ? 3.10 : duree <= 15 ? 3.30 : duree <= 20 ? 3.55 : 3.75;
+  const adj = apport < 10 ? 0.30 : apport < 20 ? 0.10 : apport < 30 ? 0 : apport < 40 ? -0.10 : -0.20;
+  return Math.round((base + adj) * 20) / 20;
 }
 
 interface Inputs {
@@ -74,10 +75,10 @@ interface Inputs {
   charges: number;
   vacance: number;
   travaux: number;
-  fraisAgence: number;       // € one-shot
-  taxeFonciere: number;      // €/an
-  expertComptable: number;   // €/an
-  assurancePNO: number;      // €/an
+  fraisAgence: number;
+  taxeFonciere: number;
+  expertComptable: number;
+  assurancePNO: number;
 }
 
 interface Results {
@@ -101,9 +102,7 @@ function compute(inputs: Inputs): Results {
   const mensualite = mensualiteCredit(montantEmprunt, inputs.taux, inputs.duree);
 
   const loyerMensuelBrut = inputs.loyer * (1 - inputs.vacance / 100);
-  // Charges % du loyer (copro, petites réparations, gestion locative)
   const chargesMensuelles = inputs.loyer * (inputs.charges / 100);
-  // Charges fixes annuelles converties en mensuel
   const chargesFixesMensuelles = (inputs.taxeFonciere + inputs.expertComptable + inputs.assurancePNO) / 12;
   const loyerNetMensuel = loyerMensuelBrut - chargesMensuelles - chargesFixesMensuelles;
 
@@ -113,11 +112,9 @@ function compute(inputs: Inputs): Results {
   const rendementBrut = (inputs.loyer * 12 / investissementTotal) * 100;
   const rendementNet = ((loyerNetMensuel * 12) / investissementTotal) * 100;
 
-  // LMNP régime réel : amortissement immeuble (85% du prix sur 30 ans) + meubles (sur 7 ans)
   const amortissementImmeuble = (inputs.prix * 0.85) / 30;
   const amortissementMeubles = inputs.ameublement / 7;
   const amortissementAnnuel = amortissementImmeuble + amortissementMeubles;
-  // Économie d'impôt estimée (tranche 30% IR + 17.2% PS)
   const economieImpotAnnuelle = amortissementAnnuel * 0.472;
 
   return {
@@ -180,22 +177,26 @@ function AddressAutocomplete({ surface, onSelect }: {
 
   return (
     <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 4 }}>
-      <label style={{ fontSize: 12, fontWeight: 600, color: "#666", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-        Quartier / adresse — <span style={{ fontWeight: 400, color: "#e67e22" }}>crucial pour estimer le loyer</span>
+      <label style={{ fontSize: 12, fontWeight: 500, color: "#6B7280" }}>
+        Quartier / adresse — <span style={{ color: ORANGE }}>crucial pour estimer le loyer</span>
       </label>
       <input
         type="text"
         value={query}
         onChange={e => search(e.target.value)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
         placeholder="Ex : Lyon 6e, Paris 11, Bordeaux Chartrons, Marseille 13008..."
-        style={{ padding: "10px 12px", borderRadius: 10, fontSize: 15, border: "1.5px solid #C7D2FD", outline: "none" }}
+        style={{
+          padding: "10px 14px", borderRadius: 10, fontSize: 15,
+          border: "1.5px solid #DDE5FF", outline: "none", fontFamily: "inherit",
+        }}
+        onFocus={e => (e.target.style.borderColor = BLUE)}
+        onBlur={e => { setTimeout(() => setOpen(false), 150); e.target.style.borderColor = "#DDE5FF"; }}
       />
       {open && (
         <div style={{
           position: "absolute", top: "100%", left: 0, right: 0, zIndex: 50,
           background: "white", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-          border: "1px solid #e2e8f0", overflow: "hidden", marginTop: 4,
+          border: "1px solid #E5EAFF", overflow: "hidden", marginTop: 4,
         }}>
           {suggestions.map((s, i) => (
             <div
@@ -205,7 +206,7 @@ function AddressAutocomplete({ surface, onSelect }: {
                 padding: "10px 14px", cursor: "pointer", borderBottom: i < suggestions.length - 1 ? "1px solid #f0f0f0" : "none",
                 display: "flex", justifyContent: "space-between", alignItems: "center",
               }}
-              onMouseEnter={e => (e.currentTarget.style.background = "#F4F6FB")}
+              onMouseEnter={e => (e.currentTarget.style.background = BG)}
               onMouseLeave={e => (e.currentTarget.style.background = "white")}
             >
               <span style={{ fontSize: 14 }}>{s.label}</span>
@@ -247,7 +248,6 @@ function AgentMessage({ text, onApplyTravaux, blue }: { text: string; onApplyTra
   let i = 0;
   while (i < lines.length) {
     const line = lines[i];
-    // Section heading (e.g. **1. TON VERDICT**)
     const headingMatch = line.match(/^\*\*(\d+\.\s*.+?)\*\*\s*$/) || line.match(/^#+\s*(.+)$/);
     if (headingMatch) {
       const label = headingMatch[1];
@@ -263,7 +263,6 @@ function AgentMessage({ text, onApplyTravaux, blue }: { text: string; onApplyTra
       );
       i++; continue;
     }
-    // Bullet
     if (line.match(/^[-•]\s+/)) {
       const bullets: string[] = [];
       while (i < lines.length && lines[i].match(/^[-•]\s+/)) {
@@ -279,14 +278,11 @@ function AgentMessage({ text, onApplyTravaux, blue }: { text: string; onApplyTra
       );
       continue;
     }
-    // Numbered list
     if (line.match(/^\d+\.\s+/)) {
       nodes.push(<p key={i} style={{ margin: "4px 0", fontSize: 14, lineHeight: 1.65, color: "#334155" }}>{renderInline(line, i)}</p>);
       i++; continue;
     }
-    // Empty line
     if (line.trim() === "") { nodes.push(<div key={i} style={{ height: 6 }} />); i++; continue; }
-    // Normal
     nodes.push(<p key={i} style={{ margin: "3px 0", fontSize: 14, lineHeight: 1.7, color: "#334155" }}>{renderInline(line, i)}</p>);
     i++;
   }
@@ -310,6 +306,24 @@ function AgentMessage({ text, onApplyTravaux, blue }: { text: string; onApplyTra
     </div>
   );
 }
+
+// Section header with accent bar
+function SectionHeader({ label, color = "#9CA3AF" }: { label: string; color?: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+      <div style={{ width: 3, height: 14, borderRadius: 2, background: BLUE, flexShrink: 0 }} />
+      <span style={{ fontSize: 12, fontWeight: 600, color, textTransform: "uppercase", letterSpacing: "0.08em" }}>{label}</span>
+    </div>
+  );
+}
+
+const cardStyle: React.CSSProperties = {
+  background: "white",
+  borderRadius: 16,
+  padding: 28,
+  border: "1px solid #E5EAFF",
+  boxShadow: "0 1px 4px rgba(37,99,235,0.06)",
+};
 
 export default function LMNPPage() {
   const [inputs, setInputs] = useState<Inputs>({
@@ -361,7 +375,6 @@ export default function LMNPPage() {
     });
   }, []);
 
-  // Global paste listener so Ctrl+V works anywhere on the page
   useEffect(() => {
     const handler = (e: ClipboardEvent) => {
       const files = Array.from(e.clipboardData?.files ?? []).filter(f => f.type.startsWith("image/"));
@@ -469,12 +482,12 @@ export default function LMNPPage() {
 
   const verdict = results
     ? results.rendementNet >= 7
-      ? { label: "🚀 Top deal !", color: GREEN, bg: "#f0fff4" }
+      ? { label: "Top deal", color: GREEN, bg: "#ECFDF5" }
       : results.rendementNet >= 5
-      ? { label: "✅ Bon plan", color: "#2f855a", bg: "#f0fff4" }
+      ? { label: "Bon plan", color: "#047857", bg: "#ECFDF5" }
       : results.rendementNet >= 3
-      ? { label: "⚠️ Limite", color: ORANGE, bg: "#fffaf0" }
-      : { label: "❌ À éviter", color: RED, bg: "#fff5f5" }
+      ? { label: "Limite", color: ORANGE, bg: "#FFFBEB" }
+      : { label: "À éviter", color: RED, bg: "#FEF2F2" }
     : null;
 
   const budgetOk = results ? results.cashFlowMensuel >= -400 : null;
@@ -484,44 +497,48 @@ export default function LMNPPage() {
     unit?: string; step?: number; min?: number;
   }) => (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <label style={{ fontSize: 12, fontWeight: 600, color: "#666", textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</label>
+      <label style={{ fontSize: 12, fontWeight: 500, color: "#6B7280" }}>{label}</label>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <input
           type="number" value={value || ""} min={min} step={step}
           onChange={e => onChange(parseFloat(e.target.value) || 0)}
           style={{
-            width: "100%", padding: "10px 12px", borderRadius: 10, fontSize: 15, fontWeight: 600,
-            border: `1.5px solid #C7D2FD`, outline: "none", background: "white",
+            width: "100%", padding: "10px 14px", borderRadius: 10, fontSize: 15, fontWeight: 600,
+            border: `1.5px solid #DDE5FF`, outline: "none", background: "white", fontFamily: "inherit",
           }}
           onFocus={e => (e.target.style.borderColor = BLUE)}
-          onBlur={e => (e.target.style.borderColor = "#C7D2FD")}
+          onBlur={e => (e.target.style.borderColor = "#DDE5FF")}
         />
-        <span style={{ color: "#888", fontWeight: 600, fontSize: 14, minWidth: 24 }}>{unit}</span>
+        <span style={{ color: "#9CA3AF", fontWeight: 500, fontSize: 14, minWidth: 28, flexShrink: 0 }}>{unit}</span>
       </div>
     </div>
   );
 
+  const suggere = tauxMarche(inputs.duree, inputs.apport);
+
   return (
-    <main style={{ minHeight: "100vh", background: BG, padding: "32px 16px", display: "flex", flexDirection: "column", alignItems: "center", gap: 24, fontFamily: "system-ui, -apple-system, sans-serif" }}>
+    <main style={{
+      minHeight: "100vh", background: BG, padding: "32px 16px",
+      display: "flex", flexDirection: "column", alignItems: "center", gap: 20,
+      fontFamily: '"Inter", system-ui, -apple-system, sans-serif',
+    }}>
 
       {/* Header */}
       <div style={{
-        width: "100%", maxWidth: 720, borderRadius: 20, padding: "32px 36px",
-        background: `linear-gradient(135deg, ${BLUE} 0%, ${TEAL} 100%)`,
-        color: "white", textAlign: "center",
+        width: "100%", maxWidth: 720, borderRadius: 20, padding: "36px 40px",
+        background: "linear-gradient(135deg, #1B3FD8 0%, #00B37D 100%)",
+        color: "white",
       }}>
-        <div style={{ fontSize: 48, marginBottom: 8 }}>🏠</div>
-        <h1 style={{ fontSize: 28, fontWeight: 900, margin: 0 }}>JuNe — Simulateur LMNP</h1>
-        <p style={{ opacity: 0.85, marginTop: 8, fontSize: 16 }}>
-          Colle une annonce, analyse ta rentabilité en 30 secondes
-        </p>
+        <div style={{ fontSize: 32, fontWeight: 900, letterSpacing: "-0.02em", lineHeight: 1 }}>JuNe</div>
+        <div style={{ fontSize: 16, fontWeight: 400, opacity: 0.8, marginTop: 6 }}>Simulateur LMNP</div>
+        <div style={{ fontSize: 13, opacity: 0.65, marginTop: 4 }}>Colle une annonce, analyse ta rentabilité en 30 secondes</div>
       </div>
 
-      <div style={{ width: "100%", maxWidth: 720, display: "flex", flexDirection: "column", gap: 20 }}>
+      <div style={{ width: "100%", maxWidth: 720, display: "flex", flexDirection: "column", gap: 16 }}>
 
         {/* Annonce */}
-        <section style={{ background: "white", borderRadius: 20, padding: 24, boxShadow: "0 2px 16px rgba(0,0,0,0.07)", border: `1px solid #e2e8f0` }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, color: BLUE, marginBottom: 12 }}>📋 Colle ton annonce</h2>
+        <section style={cardStyle}>
+          <SectionHeader label="Annonce immobilière" />
           <textarea
             rows={4}
             placeholder="Colle ici le lien ou le texte de l'annonce (SeLoger, LeBonCoin, PAP…)"
@@ -529,13 +546,14 @@ export default function LMNPPage() {
             onChange={e => set("annonce", e.target.value)}
             onPaste={handlePaste}
             style={{
-              width: "100%", padding: "12px 14px", borderRadius: 12, fontSize: 14,
-              border: "1.5px solid #C7D2FD", outline: "none", resize: "vertical",
-              fontFamily: "inherit", lineHeight: 1.5,
+              width: "100%", padding: "12px 14px", borderRadius: 10, fontSize: 14,
+              border: "1.5px solid #DDE5FF", outline: "none", resize: "vertical",
+              fontFamily: "inherit", lineHeight: 1.5, boxSizing: "border-box",
             }}
+            onFocus={e => (e.target.style.borderColor = BLUE)}
+            onBlur={e => (e.target.style.borderColor = "#DDE5FF")}
           />
 
-          {/* Drop zone images */}
           <div
             onDragOver={e => { e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
@@ -543,26 +561,25 @@ export default function LMNPPage() {
             onPaste={handlePaste}
             onClick={() => fileInputRef.current?.click()}
             style={{
-              marginTop: 10, padding: "14px 16px", borderRadius: 12, cursor: "pointer",
-              border: `2px dashed ${dragOver ? BLUE : "#C7D2FD"}`,
+              marginTop: 10, padding: "14px 16px", borderRadius: 10, cursor: "pointer",
+              border: `2px dashed ${dragOver ? BLUE : "#DDE5FF"}`,
               background: dragOver ? "#EEF2FF" : "#F8FAFF",
-              textAlign: "center", fontSize: 13, color: "#888", transition: "all 0.15s",
+              textAlign: "center", fontSize: 13, color: "#9CA3AF", transition: "all 0.15s",
             }}
           >
-            📸 Dépose ou colle des screenshots de l&apos;annonce ici
+            Dépose ou colle des screenshots de l&apos;annonce ici
             <input
               ref={fileInputRef} type="file" accept="image/*" multiple hidden
               onChange={e => { if (e.target.files) addImages(e.target.files); e.target.value = ""; }}
             />
           </div>
 
-          {/* Thumbnails */}
           {images.length > 0 && (
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
               {images.map((src, i) => (
                 <div key={i} style={{ position: "relative" }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={src} alt="" style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 8, border: "1.5px solid #C7D2FD" }} />
+                  <img src={src} alt="" style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 8, border: "1.5px solid #DDE5FF" }} />
                   <button
                     onClick={() => setImages(prev => prev.filter((_, j) => j !== i))}
                     style={{
@@ -576,32 +593,31 @@ export default function LMNPPage() {
             </div>
           )}
 
-          <button
-            onClick={parseAnnonce}
-            disabled={(!inputs.annonce.trim() && images.length === 0) || loading}
-            style={{
-              marginTop: 12, padding: "12px 28px", borderRadius: 12, fontSize: 15, fontWeight: 700,
-              background: (inputs.annonce.trim() || images.length > 0) && !loading ? `linear-gradient(135deg, ${BLUE}, ${TEAL})` : "#e2e8f0",
-              color: (inputs.annonce.trim() || images.length > 0) && !loading ? "white" : "#aaa", border: "none", cursor: (inputs.annonce.trim() || images.length > 0) && !loading ? "pointer" : "default",
-            }}
-          >
-            {loading ? "⏳ Analyse en cours…" : images.length > 0 ? "🔍 Analyser les screenshots" : "🔍 Analyser l'annonce"}
-          </button>
-          {parsed && !error && (
-            <p style={{ marginTop: 8, fontSize: 13, color: TEAL, fontWeight: 600 }}>
-              ✓ Données extraites — vérifie et ajuste si besoin ci-dessous
-            </p>
-          )}
-          {error && (
-            <p style={{ marginTop: 8, fontSize: 13, color: RED, fontWeight: 600 }}>
-              ⚠️ {error}
-            </p>
-          )}
+          <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 12 }}>
+            <button
+              onClick={parseAnnonce}
+              disabled={(!inputs.annonce.trim() && images.length === 0) || loading}
+              style={{
+                padding: "11px 24px", borderRadius: 10, fontSize: 14, fontWeight: 700,
+                background: (inputs.annonce.trim() || images.length > 0) && !loading ? `linear-gradient(135deg, ${BLUE}, ${TEAL})` : "#E5EAFF",
+                color: (inputs.annonce.trim() || images.length > 0) && !loading ? "white" : "#9CA3AF",
+                border: "none", cursor: (inputs.annonce.trim() || images.length > 0) && !loading ? "pointer" : "default",
+              }}
+            >
+              {loading ? "Analyse en cours…" : images.length > 0 ? "Analyser les screenshots" : "Analyser l'annonce"}
+            </button>
+            {parsed && !error && (
+              <span style={{ fontSize: 13, color: TEAL, fontWeight: 600 }}>Données extraites — vérifie ci-dessous</span>
+            )}
+            {error && (
+              <span style={{ fontSize: 13, color: RED, fontWeight: 600 }}>⚠️ {error}</span>
+            )}
+          </div>
         </section>
 
         {/* Infos bien */}
-        <section style={{ background: "white", borderRadius: 20, padding: 24, boxShadow: "0 2px 16px rgba(0,0,0,0.07)", border: `1px solid #e2e8f0` }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, color: BLUE, marginBottom: 16 }}>🏢 Le bien</h2>
+        <section style={cardStyle}>
+          <SectionHeader label="Le bien" />
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <div style={{ gridColumn: "1/-1" }}>
               <AddressAutocomplete
@@ -626,15 +642,15 @@ export default function LMNPPage() {
             <div>
               <Field label="Budget travaux" value={inputs.travaux} onChange={v => set("travaux", v)} step={500} />
               {etatBien && (
-                <p style={{ marginTop: 6, fontSize: 12, color: "#888", fontStyle: "italic" }}>
-                  🔍 {etatBien}
+                <p style={{ marginTop: 6, fontSize: 12, color: "#9CA3AF", fontStyle: "italic" }}>
+                  {etatBien}
                 </p>
               )}
             </div>
           </div>
           {loyerInfo && inputs.loyer > 0 && (
-            <p style={{ marginTop: 12, fontSize: 13, color: "#888" }}>
-              💡 <strong>{fmt(loyerInfo.loyerM2, 0)} €/m²</strong> estimé
+            <p style={{ marginTop: 14, fontSize: 13, color: "#6B7280" }}>
+              <strong style={{ color: BLUE }}>{fmt(loyerInfo.loyerM2, 0)} €/m²</strong> estimé
               {loyerInfo.precision === "arrondissement" ? ` dans cet arrondissement` : loyerInfo.precision === "codePostal" ? ` dans ce secteur` : ` à ${loyerInfo.city}`}
               {" "}— données observatoires 2025, à vérifier sur PAP/Leboncoin
             </p>
@@ -642,18 +658,41 @@ export default function LMNPPage() {
         </section>
 
         {/* Financement */}
-        <section style={{ background: "white", borderRadius: 20, padding: 24, boxShadow: "0 2px 16px rgba(0,0,0,0.07)", border: `1px solid #e2e8f0` }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, color: BLUE, marginBottom: 16 }}>💳 Financement & charges</h2>
+        <section style={cardStyle}>
+          <SectionHeader label="Financement" />
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <Field label="Apport" value={inputs.apport} onChange={v => set("apport", v)} unit="%" min={0} step={1} />
-            <Field label="Taux crédit" value={inputs.taux} onChange={v => set("taux", v)} unit="%" step={0.05} />
             <Field label="Durée" value={inputs.duree} onChange={v => set("duree", v)} unit="ans" step={1} />
+          </div>
+
+          {/* Taux suggéré banner */}
+          <div style={{
+            marginTop: 12, padding: "10px 14px", borderRadius: 10,
+            background: "#EFF6FF", border: "1px solid #BFDBFE",
+            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+            fontSize: 13, color: "#1E3A8A",
+          }}>
+            <span>
+              Taux marché estimé pour {inputs.duree} ans avec {inputs.apport}% d&apos;apport : <strong>{suggere}%</strong>
+            </span>
+            <button
+              onClick={() => set("taux", suggere)}
+              style={{
+                flexShrink: 0, padding: "4px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+                background: BLUE, color: "white", border: "none", cursor: "pointer",
+              }}
+            >Appliquer</button>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 14 }}>
+            <Field label="Taux crédit" value={inputs.taux} onChange={v => set("taux", v)} unit="%" step={0.05} />
             <Field label="Frais de notaire" value={inputs.fraisNotaire} onChange={v => set("fraisNotaire", v)} unit="%" step={0.1} />
             <Field label="Frais d'agence achat" value={inputs.fraisAgence} onChange={v => set("fraisAgence", v)} step={500} />
             <Field label="Ameublement LMNP" value={inputs.ameublement} onChange={v => set("ameublement", v)} step={500} />
           </div>
-          <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #f0f0f0" }}>
-            <p style={{ fontSize: 12, fontWeight: 600, color: "#666", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>Charges annuelles récurrentes</p>
+
+          <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid #E5EAFF" }}>
+            <SectionHeader label="Charges annuelles récurrentes" />
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <Field label="Taxe foncière" value={inputs.taxeFonciere} onChange={v => set("taxeFonciere", v)} step={50} />
               <Field label="Expert-comptable" value={inputs.expertComptable} onChange={v => set("expertComptable", v)} step={50} />
@@ -661,7 +700,7 @@ export default function LMNPPage() {
               <Field label="Gestion + copro" value={inputs.charges} onChange={v => set("charges", v)} unit="% loyer" step={1} />
             </div>
           </div>
-          <div style={{ marginTop: 10 }}>
+          <div style={{ marginTop: 14 }}>
             <Field label="Vacance locative" value={inputs.vacance} onChange={v => set("vacance", v)} unit="%" step={0.5} />
           </div>
         </section>
@@ -669,72 +708,96 @@ export default function LMNPPage() {
         {/* Résultats */}
         {results && verdict && (
           <>
-            {/* Verdict */}
-            <div style={{
-              borderRadius: 20, padding: "20px 28px", textAlign: "center",
-              background: verdict.bg, border: `2px solid ${verdict.color}`,
-            }}>
-              <div style={{ fontSize: 32, fontWeight: 900, color: verdict.color }}>{verdict.label}</div>
-              <div style={{ fontSize: 15, color: verdict.color, marginTop: 4, opacity: 0.85 }}>
-                Rendement net : <strong>{fmt(results.rendementNet, 2)}%</strong> · Brut : <strong>{fmt(results.rendementBrut, 2)}%</strong>
+            {/* Verdict + résumé horizontal */}
+            <section style={{ ...cardStyle, padding: "20px 28px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
+                  <span style={{ fontSize: 28, fontWeight: 900, color: verdict.color, fontVariantNumeric: "tabular-nums" }}>
+                    {fmt(results.rendementNet, 2)}%
+                  </span>
+                  <span style={{ fontSize: 13, color: "#6B7280", fontWeight: 500 }}>rendement net</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                  <span style={{
+                    fontSize: 24, fontWeight: 800,
+                    color: results.cashFlowMensuel >= -400 ? GREEN : RED,
+                    fontVariantNumeric: "tabular-nums",
+                  }}>
+                    {results.cashFlowMensuel >= 0 ? "+" : ""}{fmt(results.cashFlowMensuel)} €
+                  </span>
+                  <span style={{ fontSize: 13, color: "#6B7280", fontWeight: 500 }}>/mois</span>
+                </div>
+                <div style={{
+                  padding: "6px 14px", borderRadius: 999, fontSize: 13, fontWeight: 700,
+                  background: verdict.bg, color: verdict.color, border: `1px solid ${verdict.color}30`,
+                }}>
+                  {verdict.label}
+                </div>
+                <div style={{
+                  padding: "6px 14px", borderRadius: 999, fontSize: 13, fontWeight: 600,
+                  background: budgetOk ? "#ECFDF5" : "#FEF2F2",
+                  color: budgetOk ? GREEN : RED,
+                  border: `1px solid ${budgetOk ? "#A7F3D0" : "#FECACA"}`,
+                }}>
+                  {budgetOk ? "Budget OK" : `Effort ${fmt(Math.abs(results.cashFlowMensuel))} €/mois`}
+                </div>
               </div>
-              <div style={{
-                marginTop: 12, padding: "8px 16px", borderRadius: 10, display: "inline-block", fontSize: 14, fontWeight: 700,
-                background: budgetOk ? "#f0fff4" : "#fff5f5",
-                color: budgetOk ? GREEN : RED,
-                border: `1px solid ${budgetOk ? "#9ae6b4" : "#feb2b2"}`,
-              }}>
-                {budgetOk ? "✓" : "✗"} Budget mensuel : {fmt(Math.abs(results.cashFlowMensuel))} €/{budgetOk ? "gain" : "effort"} — objectif ≤ 400 €/mois
+              <div style={{ marginTop: 12, fontSize: 13, color: "#9CA3AF" }}>
+                Rendement brut : <strong style={{ color: "#374151" }}>{fmt(results.rendementBrut, 2)}%</strong>
+                {" "}· Apport requis ≤ 400 €/mois pour budget acceptable
               </div>
-            </div>
+            </section>
 
-            {/* Chiffres clés */}
-            <section style={{ background: "white", borderRadius: 20, padding: 24, boxShadow: "0 2px 16px rgba(0,0,0,0.07)", border: `1px solid #e2e8f0` }}>
-              <h2 style={{ fontSize: 16, fontWeight: 700, color: BLUE, marginBottom: 16 }}>📊 Cash flow</h2>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            {/* Cash flow — 3 colonnes */}
+            <section style={cardStyle}>
+              <SectionHeader label="Cash flow mensuel" />
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
                 {[
                   { label: "Invest. total", value: fmt(results.investissementTotal) + " €", sub: `prix + notaire${inputs.travaux > 0 ? " + travaux" : ""} + meubles` },
-                  { label: "Emprunt", value: fmt(results.montantEmprunt) + " €", sub: `apport ${inputs.apport}%${inputs.travaux > 0 ? ` · travaux ${fmt(inputs.travaux)} € financés` : ""}` },
+                  { label: "Emprunt", value: fmt(results.montantEmprunt) + " €", sub: `apport ${inputs.apport}%${inputs.travaux > 0 ? ` · travaux ${fmt(inputs.travaux)} €` : ""}` },
                   { label: "Mensualité crédit", value: fmt(results.mensualiteCredit) + " €/mois", sub: `${inputs.taux}% sur ${inputs.duree} ans`, color: RED },
-                  { label: "Loyer net encaissé", value: fmt(results.loyerNetMensuel) + " €/mois", sub: `après charges (${inputs.charges}%), taxe foncière, assurance, expert-comptable`, color: GREEN },
-                  { label: "Cash flow mensuel", value: (results.cashFlowMensuel >= 0 ? "+" : "") + fmt(results.cashFlowMensuel) + " €", sub: "loyer net - crédit", color: results.cashFlowMensuel >= -400 ? GREEN : RED, big: true },
+                  { label: "Loyer net encaissé", value: fmt(results.loyerNetMensuel) + " €/mois", sub: `après charges, taxe, assurance`, color: GREEN },
+                  { label: "Cash flow mensuel", value: (results.cashFlowMensuel >= 0 ? "+" : "") + fmt(results.cashFlowMensuel) + " €", sub: "loyer net − crédit", color: results.cashFlowMensuel >= -400 ? GREEN : RED, big: true },
                   { label: "Cash flow annuel", value: (results.cashFlowAnnuel >= 0 ? "+" : "") + fmt(results.cashFlowAnnuel) + " €", sub: "sur 12 mois", color: results.cashFlowAnnuel >= 0 ? GREEN : RED, big: true },
                 ].map((item, i) => (
                   <div key={i} style={{
-                    padding: "14px 16px", borderRadius: 14, background: "#F4F6FB",
-                    border: item.big ? `2px solid ${item.color || BLUE}` : "1px solid #e2e8f0",
+                    padding: "14px 16px", borderRadius: 12,
+                    background: item.big ? `${item.color || BLUE}08` : "#F8FAFF",
+                    border: item.big ? `1.5px solid ${item.color || BLUE}30` : "1px solid #E5EAFF",
                   }}>
-                    <div style={{ fontSize: 11, color: "#888", fontWeight: 600, textTransform: "uppercase", marginBottom: 4 }}>{item.label}</div>
-                    <div style={{ fontSize: item.big ? 22 : 18, fontWeight: 900, color: item.color || "#1a1a2e" }}>{item.value}</div>
-                    <div style={{ fontSize: 11, color: "#aaa", marginTop: 2 }}>{item.sub}</div>
+                    <div style={{ fontSize: 11, color: "#9CA3AF", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>{item.label}</div>
+                    <div style={{ fontSize: item.big ? 20 : 17, fontWeight: 800, color: item.color || "#111827", fontVariantNumeric: "tabular-nums" }}>{item.value}</div>
+                    <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 4, lineHeight: 1.4 }}>{item.sub}</div>
                   </div>
                 ))}
               </div>
             </section>
 
             {/* Avantage LMNP */}
-            <section style={{ background: "white", borderRadius: 20, padding: 24, boxShadow: "0 2px 16px rgba(0,0,0,0.07)", border: `1px solid #e2e8f0` }}>
-              <h2 style={{ fontSize: 16, fontWeight: 700, color: BLUE, marginBottom: 4 }}>⚡ Avantage fiscal LMNP (régime réel)</h2>
-              <p style={{ fontSize: 13, color: "#888", marginBottom: 16 }}>Amortissement du bien et des meubles = revenus locatifs souvent non imposés pendant 10-15 ans</p>
+            <section style={cardStyle}>
+              <SectionHeader label="Avantage fiscal LMNP — régime réel" color={GREEN} />
+              <p style={{ fontSize: 13, color: "#6B7280", marginBottom: 16, marginTop: -8, lineHeight: 1.6 }}>
+                Amortissement du bien et des meubles = revenus locatifs souvent non imposés pendant 10–15 ans
+              </p>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 {[
                   { label: "Amortissement annuel", value: fmt(results.amortissementAnnuel) + " €", sub: "immeuble (30 ans) + meubles (7 ans)" },
                   { label: "Économie d'impôt estimée", value: "~" + fmt(results.economieImpotAnnuelle) + " €/an", sub: "tranche 30% IR + 17.2% prélèvements sociaux" },
                 ].map((item, i) => (
-                  <div key={i} style={{ padding: "14px 16px", borderRadius: 14, background: "#f0fff4", border: `1px solid #9ae6b4` }}>
-                    <div style={{ fontSize: 11, color: "#276749", fontWeight: 600, textTransform: "uppercase", marginBottom: 4 }}>{item.label}</div>
-                    <div style={{ fontSize: 18, fontWeight: 900, color: GREEN }}>{item.value}</div>
-                    <div style={{ fontSize: 11, color: "#68d391", marginTop: 2 }}>{item.sub}</div>
+                  <div key={i} style={{ padding: "14px 16px", borderRadius: 12, background: "#F0FDF4", border: "1px solid #A7F3D0" }}>
+                    <div style={{ fontSize: 11, color: GREEN, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>{item.label}</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: GREEN, fontVariantNumeric: "tabular-nums" }}>{item.value}</div>
+                    <div style={{ fontSize: 11, color: "#6EE7B7", marginTop: 4 }}>{item.sub}</div>
                   </div>
                 ))}
               </div>
-              <p style={{ fontSize: 11, color: "#aaa", marginTop: 12 }}>
-                * Estimation indicative. Consulte un comptable spécialisé LMNP pour optimiser ton montage fiscal.
+              <p style={{ fontSize: 11, color: "#9CA3AF", marginTop: 14 }}>
+                Estimation indicative. Consulte un comptable spécialisé LMNP pour optimiser ton montage fiscal.
               </p>
             </section>
 
             {/* Avis agent — chat */}
-            <section style={{ background: "white", borderRadius: 20, overflow: "hidden", boxShadow: "0 2px 20px rgba(30,79,204,0.08)", border: `1px solid ${BLUE}18` }}>
+            <section style={{ background: "white", borderRadius: 16, overflow: "hidden", border: `1px solid #E5EAFF`, boxShadow: "0 1px 4px rgba(37,99,235,0.06)" }}>
               {/* Header */}
               <div style={{ padding: "18px 24px 16px", borderBottom: `1px solid #EEF2FF`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -796,10 +859,12 @@ export default function LMNPPage() {
                       placeholder="Ex : immeuble années 70, cuisine et sdb à refaire, charges de copro 180 €/mois, DPE D. Je cherche à défiscaliser sur 10 ans…"
                       style={{
                         width: "100%", padding: "14px 16px", paddingBottom: 48, borderRadius: 14, fontSize: 14,
-                        border: "1.5px solid #dde5ff", outline: "none", resize: "none",
+                        border: "1.5px solid #DDE5FF", outline: "none", resize: "none",
                         fontFamily: "inherit", lineHeight: 1.6, boxSizing: "border-box",
                         color: "#0f172a", background: "#fafbff",
                       }}
+                      onFocus={e => (e.target.style.borderColor = BLUE)}
+                      onBlur={e => (e.target.style.borderColor = "#DDE5FF")}
                     />
                     <button
                       onClick={async () => {
@@ -909,10 +974,12 @@ export default function LMNPPage() {
                         placeholder="Réponds à l'agent… (Entrée pour envoyer, Maj+Entrée pour aller à la ligne)"
                         style={{
                           flex: 1, padding: "10px 14px", borderRadius: 12, fontSize: 14,
-                          border: "1.5px solid #dde5ff", outline: "none", resize: "none", overflow: "hidden",
+                          border: "1.5px solid #DDE5FF", outline: "none", resize: "none", overflow: "hidden",
                           fontFamily: "inherit", lineHeight: 1.5, background: "white", color: "#0f172a",
                           minHeight: 42, transition: "border-color 0.15s",
                         }}
+                        onFocus={e => (e.target.style.borderColor = BLUE)}
+                        onBlur={e => (e.target.style.borderColor = "#DDE5FF")}
                       />
                       <button
                         onClick={sendReply}
@@ -943,18 +1010,18 @@ export default function LMNPPage() {
             `}</style>
 
             {/* Grille de lecture */}
-            <section style={{ background: "white", borderRadius: 20, padding: 24, boxShadow: "0 2px 16px rgba(0,0,0,0.07)", border: `1px solid #e2e8f0` }}>
-              <h2 style={{ fontSize: 16, fontWeight: 700, color: BLUE, marginBottom: 12 }}>📏 Grille de lecture</h2>
+            <section style={cardStyle}>
+              <SectionHeader label="Grille de lecture" />
               {[
-                { seuil: "≥ 7%", label: "🚀 Top deal", desc: "Cashflow positif probable, forte rentabilité", color: GREEN },
-                { seuil: "5–7%", label: "✅ Bon plan", desc: "Effort mensuel raisonnable, bon investissement", color: "#2f855a" },
-                { seuil: "3–5%", label: "⚠️ Limite", desc: "Regarder si la plus-value compense", color: ORANGE },
-                { seuil: "< 3%", label: "❌ À éviter", desc: "Trop d'effort sans rentabilité suffisante", color: RED },
+                { seuil: "≥ 7%", label: "Top deal", desc: "Cash flow positif probable, forte rentabilité", color: GREEN },
+                { seuil: "5–7%", label: "Bon plan", desc: "Effort mensuel raisonnable, bon investissement", color: "#047857" },
+                { seuil: "3–5%", label: "Limite", desc: "Regarder si la plus-value compense", color: ORANGE },
+                { seuil: "< 3%", label: "À éviter", desc: "Trop d'effort sans rentabilité suffisante", color: RED },
               ].map((row, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: i < 3 ? "1px solid #f0f0f0" : "none" }}>
-                  <span style={{ fontWeight: 900, color: row.color, minWidth: 52, fontSize: 14 }}>{row.seuil}</span>
-                  <span style={{ fontWeight: 700, color: row.color, minWidth: 120 }}>{row.label}</span>
-                  <span style={{ fontSize: 13, color: "#666" }}>{row.desc}</span>
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: i < 3 ? "1px solid #F3F4F6" : "none" }}>
+                  <span style={{ fontWeight: 800, color: row.color, minWidth: 52, fontSize: 14, fontVariantNumeric: "tabular-nums" }}>{row.seuil}</span>
+                  <span style={{ fontWeight: 600, color: row.color, minWidth: 100, fontSize: 13 }}>{row.label}</span>
+                  <span style={{ fontSize: 13, color: "#6B7280" }}>{row.desc}</span>
                 </div>
               ))}
             </section>
@@ -962,8 +1029,8 @@ export default function LMNPPage() {
         )}
 
         {!results && (
-          <div style={{ textAlign: "center", padding: 32, color: "#aaa", fontSize: 15 }}>
-            ↑ Remplis le prix d&apos;achat et le loyer pour voir les résultats
+          <div style={{ textAlign: "center", padding: 32, color: "#9CA3AF", fontSize: 15 }}>
+            Remplis le prix d&apos;achat et le loyer pour voir les résultats
           </div>
         )}
       </div>
