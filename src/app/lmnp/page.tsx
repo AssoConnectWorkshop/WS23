@@ -325,6 +325,192 @@ const cardStyle: React.CSSProperties = {
   boxShadow: "0 1px 4px rgba(37,99,235,0.06)",
 };
 
+function mdToHtml(text: string): string {
+  return text
+    // Strip markdown tables (lines with |)
+    .replace(/^\|.*\|$/gm, "")
+    .replace(/^\|[-| :]+\|$/gm, "")
+    // Headings
+    .replace(/^#{1,3}\s+(.+)$/gm, "<h3>$1</h3>")
+    // Horizontal rules
+    .replace(/^---+$/gm, "<hr>")
+    // Bold
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    // Bullet points
+    .replace(/^[-•✅❌]\s+(.+)$/gm, "<li>$1</li>")
+    // Wrap consecutive <li> in <ul>
+    .replace(/(<li>.*<\/li>\n?)+/g, m => `<ul>${m}</ul>`)
+    // Blockquote
+    .replace(/^>\s+(.+)$/gm, "<blockquote>$1</blockquote>")
+    // Paragraphs: blank lines → <br>
+    .replace(/\n{2,}/g, "<br><br>")
+    .replace(/\n/g, " ")
+    // Clean up empty tags
+    .replace(/<h3><\/h3>/g, "")
+    .trim();
+}
+
+function openPrintWindow(
+  inputs: Inputs,
+  results: Results,
+  verdict: { label: string; color: string; bg: string } | null,
+  conversation: { role: string; text: string }[]
+) {
+  const f = (n: number, d = 0) => Math.round(n).toLocaleString("fr-FR");
+  const date = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  const cfColor = results.cashFlowMensuel >= 0 ? "#059669" : "#dc2626";
+  const loyerNetColor = results.loyerNetMensuel >= 0 ? "#059669" : "#f59e0b";
+
+  const agentMsgs = conversation.filter(m => m.role === "agent");
+  const firstAgent = agentMsgs[0];
+  const lastAgent = agentMsgs.length > 1 ? agentMsgs[agentMsgs.length - 1] : null;
+
+  const agentSection = agentMsgs.length > 0 ? `
+    <div class="section-title">Avis de l'agent expert LMNP</div>
+    <div class="agent-box">
+      ${firstAgent ? mdToHtml(firstAgent.text) : ""}
+    </div>
+    ${lastAgent ? `<div class="agent-label">Analyse finale</div><div class="agent-box">${mdToHtml(lastAgent.text)}</div>` : ""}
+  ` : "";
+
+  const cashRows = [
+    { label: `Loyer brut`, value: inputs.loyer, color: "#059669" },
+    { label: `− Vacance (${inputs.vacance}%)`, value: -Math.round(inputs.loyer * inputs.vacance / 100), color: "#dc2626" },
+    { label: `− Charges & gestion (${inputs.charges}%)`, value: -Math.round(inputs.loyer * inputs.charges / 100), color: "#dc2626" },
+    { label: `− Taxe foncière (÷12)`, value: -Math.round(inputs.taxeFonciere / 12), color: "#dc2626" },
+    { label: `− Comptable + PNO (÷12)`, value: -Math.round((inputs.expertComptable + inputs.assurancePNO) / 12), color: "#dc2626" },
+    { label: `= Loyer net`, value: Math.round(results.loyerNetMensuel), color: loyerNetColor, bold: true },
+    { label: `− Mensualité crédit`, value: -Math.round(results.mensualiteCredit), color: "#dc2626" },
+    { label: `= Cash flow mensuel`, value: Math.round(results.cashFlowMensuel), color: cfColor, bold: true, big: true },
+  ].map(r => `
+    <tr class="${r.big ? "row-big" : r.bold ? "row-bold" : ""}">
+      <td>${r.label}</td>
+      <td style="color:${r.color};text-align:right;font-weight:${r.bold ? 700 : 400}">${r.value >= 0 ? "+" : ""}${f(r.value)} €</td>
+    </tr>
+  `).join("");
+
+  const html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>JuNe — Analyse LMNP · ${inputs.ville || "Bien"}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Inter", system-ui, -apple-system, sans-serif; color: #0f172a; background: white; font-size: 13px; line-height: 1.5; }
+  .page { max-width: 780px; margin: 0 auto; padding: 32px 40px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 16px; border-bottom: 2.5px solid #2563EB; margin-bottom: 22px; }
+  .logo { font-size: 26px; font-weight: 900; color: #2563EB; letter-spacing: -0.03em; }
+  .logo-sub { font-size: 11px; color: #64748b; margin-top: 2px; }
+  .prop-name { font-size: 16px; font-weight: 700; text-align: right; }
+  .prop-sub { font-size: 11px; color: #64748b; text-align: right; margin-top: 3px; }
+  .verdict-box { display: flex; align-items: center; gap: 18px; padding: 14px 20px; border-radius: 10px; margin-bottom: 22px; background: ${verdict?.bg || "#f8faff"}; border: 2px solid ${verdict?.color ? verdict.color + "50" : "#e2e8f0"}; }
+  .verdict-label { font-size: 30px; font-weight: 900; color: ${verdict?.color || "#0f172a"}; }
+  .verdict-detail { font-size: 13px; color: ${verdict?.color || "#374151"}; font-weight: 600; }
+  .verdict-cf { font-size: 12px; color: #64748b; margin-top: 3px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin-bottom: 22px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+  .grid-item { display: flex; justify-content: space-between; align-items: center; padding: 9px 14px; border-bottom: 1px solid #f1f5f9; }
+  .grid-item:nth-child(odd) { border-right: 1px solid #f1f5f9; }
+  .grid-label { font-size: 11px; color: #64748b; }
+  .grid-value { font-size: 13px; font-weight: 700; }
+  .section-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #2563EB; padding-bottom: 7px; border-bottom: 1px solid #dbeafe; margin-bottom: 12px; margin-top: 20px; }
+  table.cf { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+  table.cf td { padding: 5px 8px; font-size: 12px; }
+  table.cf tr.row-bold td { border-top: 1px solid #e2e8f0; padding-top: 8px; font-weight: 600; }
+  table.cf tr.row-big { background: ${cfColor}12; border-radius: 6px; }
+  table.cf tr.row-big td { font-size: 15px; font-weight: 800; padding: 8px 10px; }
+  .fiscal { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; margin-bottom: 20px; }
+  .fiscal-box { background: #f0fdf4; border: 1px solid #a7f3d0; border-radius: 8px; padding: 12px 14px; }
+  .fiscal-label { font-size: 10px; font-weight: 700; color: #059669; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+  .fiscal-value { font-size: 18px; font-weight: 800; color: #059669; }
+  .fiscal-sub { font-size: 10px; color: #6ee7b7; margin-top: 2px; }
+  .agent-box { background: #f8faff; border: 1px solid #e8eeff; border-radius: 8px; padding: 14px 16px; font-size: 12px; line-height: 1.75; color: #1e293b; margin-bottom: 10px; }
+  .agent-box h3 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #2563EB; margin: 14px 0 5px; }
+  .agent-box h3:first-child { margin-top: 0; }
+  .agent-box ul { padding-left: 18px; margin: 5px 0; }
+  .agent-box li { margin: 3px 0; }
+  .agent-box hr { border: none; border-top: 1px solid #e2e8f0; margin: 8px 0; }
+  .agent-box blockquote { border-left: 3px solid #2563EB; padding-left: 10px; color: #374151; font-style: italic; margin: 6px 0; }
+  .agent-label { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; margin: 12px 0 5px; }
+  .footer { border-top: 1px solid #e2e8f0; padding-top: 10px; display: flex; justify-content: space-between; font-size: 9px; color: #94a3b8; margin-top: 20px; }
+  @media print {
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .page { padding: 20px 28px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div>
+      <div class="logo">JuNe</div>
+      <div class="logo-sub">Simulateur LMNP — Analyse d'investissement</div>
+    </div>
+    <div>
+      <div class="prop-name">${inputs.ville || "Bien immobilier"}</div>
+      <div class="prop-sub">${inputs.surface} m² · ${f(inputs.prix)} € · ${date}</div>
+    </div>
+  </div>
+
+  ${verdict ? `
+  <div class="verdict-box">
+    <div class="verdict-label">${verdict.label}</div>
+    <div>
+      <div class="verdict-detail">Rendement net ${results.rendementNet.toFixed(2)}% · Rendement brut ${results.rendementBrut.toFixed(2)}%</div>
+      <div class="verdict-cf">Cash flow mensuel : <strong style="color:${cfColor}">${results.cashFlowMensuel >= 0 ? "+" : ""}${f(results.cashFlowMensuel)} €/mois</strong></div>
+    </div>
+  </div>` : ""}
+
+  <div class="section-title">Chiffres clés</div>
+  <div class="grid2">
+    ${[
+      { label: "Prix d'achat", value: `${f(inputs.prix)} €` },
+      { label: "Surface", value: `${inputs.surface} m²` },
+      { label: "Investissement total", value: `${f(results.investissementTotal)} €` },
+      { label: "Emprunt", value: `${f(results.montantEmprunt)} €` },
+      { label: "Apport", value: `${inputs.apport}%` },
+      { label: "Taux / Durée", value: `${inputs.taux}% sur ${inputs.duree} ans` },
+      { label: "Mensualité crédit", value: `<span style="color:#dc2626">${f(results.mensualiteCredit)} €/mois</span>` },
+      { label: "Loyer estimé", value: `<span style="color:#059669">${f(inputs.loyer)} €/mois</span>` },
+      { label: "Budget travaux", value: `${f(inputs.travaux)} €` },
+      { label: "Rendement brut", value: `${results.rendementBrut.toFixed(2)}%` },
+    ].map(item => `<div class="grid-item"><span class="grid-label">${item.label}</span><span class="grid-value">${item.value}</span></div>`).join("")}
+  </div>
+
+  <div class="section-title">Détail du cash flow mensuel</div>
+  <table class="cf">
+    ${cashRows}
+  </table>
+
+  <div class="fiscal">
+    <div class="fiscal-box">
+      <div class="fiscal-label">Amortissement annuel</div>
+      <div class="fiscal-value">${f(results.amortissementAnnuel)} €</div>
+      <div class="fiscal-sub">immeuble 30 ans + meubles 7 ans</div>
+    </div>
+    <div class="fiscal-box">
+      <div class="fiscal-label">Économie d'impôt estimée</div>
+      <div class="fiscal-value">~${f(results.economieImpotAnnuelle)} €/an</div>
+      <div class="fiscal-sub">tranche 30% IR + 17.2% prélèvements sociaux</div>
+    </div>
+  </div>
+
+  ${agentSection}
+
+  <div class="footer">
+    <span>JuNe — Simulateur LMNP · Estimation indicative, non contractuelle</span>
+    <span>Consulte un expert-comptable spécialisé LMNP pour valider ton montage fiscal</span>
+  </div>
+</div>
+<script>window.onload = () => { window.print(); }</script>
+</body>
+</html>`;
+
+  const w = window.open("", "_blank");
+  if (!w) return;
+  w.document.write(html);
+  w.document.close();
+}
+
 export default function LMNPPage() {
   const [inputs, setInputs] = useState<Inputs>({
     annonce: "",
@@ -1094,19 +1280,7 @@ export default function LMNPPage() {
                 0%, 80%, 100% { opacity: 0.2; transform: scale(0.85); }
                 40% { opacity: 1; transform: scale(1); }
               }
-              .print-only { display: none; }
-              @media print {
-                .no-print { display: none !important; }
-                .print-only { display: block !important; }
-                body * { visibility: hidden; }
-                .print-only, .print-only * { visibility: visible; }
-                .print-only {
-                  position: fixed; top: 0; left: 0; width: 100%;
-                  padding: 28px 40px; box-sizing: border-box;
-                  background: white; overflow: visible;
-                }
-                * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-              }
+              @media print { .no-print { display: none !important; } }
             `}</style>
 
             {/* Grille de lecture */}
@@ -1127,10 +1301,10 @@ export default function LMNPPage() {
             </section>
 
             {/* Export PDF */}
-            {conversation.length > 0 && (
+            {conversation.length > 0 && results && (
               <div style={{ textAlign: "center", paddingBottom: 8 }} className="no-print">
                 <button
-                  onClick={() => window.print()}
+                  onClick={() => openPrintWindow(inputs, results, verdict, conversation)}
                   style={{
                     padding: "13px 32px", borderRadius: 12, fontSize: 15, fontWeight: 700,
                     background: `linear-gradient(135deg, ${BLUE}, #6366f1)`,
@@ -1145,111 +1319,6 @@ export default function LMNPPage() {
                   Télécharger l&apos;analyse en PDF
                 </button>
                 <p style={{ marginTop: 8, fontSize: 12, color: "#9CA3AF" }}>Synthèse : chiffres clés + avis de l&apos;agent</p>
-              </div>
-            )}
-
-            {/* ===== LAYOUT PRINT-ONLY ===== */}
-            {results && (
-              <div className="print-only" style={{ fontFamily: '"Inter", system-ui, sans-serif', color: "#0f172a", background: "white" }}>
-                {/* En-tête */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28, paddingBottom: 20, borderBottom: "2px solid #2563EB" }}>
-                  <div>
-                    <div style={{ fontSize: 22, fontWeight: 900, color: "#2563EB", letterSpacing: "-0.02em" }}>JuNe</div>
-                    <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Simulateur LMNP — Analyse d&apos;investissement</div>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 15, fontWeight: 700 }}>{inputs.ville || "Bien immobilier"}</div>
-                    <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>{inputs.surface} m² · {inputs.prix.toLocaleString("fr-FR")} € · {new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}</div>
-                  </div>
-                </div>
-
-                {/* Verdict */}
-                {verdict && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24, padding: "14px 20px", borderRadius: 12, background: verdict.bg, border: `2px solid ${verdict.color}40` }}>
-                    <div style={{ fontSize: 28, fontWeight: 900, color: verdict.color }}>{verdict.label}</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, color: verdict.color, fontWeight: 600 }}>Rendement net {fmt(results.rendementNet, 2)}% · Rendement brut {fmt(results.rendementBrut, 2)}%</div>
-                      <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>Cash flow mensuel : <strong style={{ color: results.cashFlowMensuel >= 0 ? "#059669" : "#dc2626" }}>{results.cashFlowMensuel >= 0 ? "+" : ""}{fmt(results.cashFlowMensuel)} €/mois</strong></div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Chiffres clés — 2 colonnes */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 }}>
-                  {[
-                    { label: "Prix d'achat", value: `${fmt(inputs.prix)} €` },
-                    { label: "Surface", value: `${inputs.surface} m²` },
-                    { label: "Investissement total", value: `${fmt(results.investissementTotal)} €` },
-                    { label: "Emprunt", value: `${fmt(results.montantEmprunt)} €` },
-                    { label: "Apport", value: `${inputs.apport}%` },
-                    { label: "Taux / Durée", value: `${inputs.taux}% sur ${inputs.duree} ans` },
-                    { label: "Mensualité crédit", value: `${fmt(results.mensualiteCredit)} €/mois`, color: "#dc2626" },
-                    { label: "Loyer estimé", value: `${fmt(inputs.loyer)} €/mois`, color: "#059669" },
-                    { label: "Budget travaux", value: `${fmt(inputs.travaux)} €` },
-                    { label: "Amortissement LMNP", value: `${fmt(results.amortissementAnnuel)} €/an`, color: "#059669" },
-                  ].map((item, i) => (
-                    <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #f1f5f9" }}>
-                      <span style={{ fontSize: 12, color: "#64748b" }}>{item.label}</span>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: item.color || "#0f172a" }}>{item.value}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Détail cash flow */}
-                <div style={{ marginBottom: 24 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#2563EB", marginBottom: 10, paddingBottom: 6, borderBottom: "1px solid #dbeafe" }}>Détail du cash flow mensuel</div>
-                  {[
-                    { label: "Loyer brut", value: inputs.loyer, color: "#059669" },
-                    { label: `− Vacance (${inputs.vacance}%)`, value: -Math.round(inputs.loyer * inputs.vacance / 100), color: "#dc2626" },
-                    { label: `− Charges & gestion (${inputs.charges}%)`, value: -Math.round(inputs.loyer * inputs.charges / 100), color: "#dc2626" },
-                    { label: `− Taxe foncière (÷12)`, value: -Math.round(inputs.taxeFonciere / 12), color: "#dc2626" },
-                    { label: `− Comptable + PNO (÷12)`, value: -Math.round((inputs.expertComptable + inputs.assurancePNO) / 12), color: "#dc2626" },
-                    { label: "= Loyer net", value: Math.round(results.loyerNetMensuel), color: "#0f172a", bold: true },
-                    { label: `− Mensualité crédit`, value: -Math.round(results.mensualiteCredit), color: "#dc2626" },
-                    { label: "= Cash flow mensuel", value: Math.round(results.cashFlowMensuel), color: results.cashFlowMensuel >= 0 ? "#059669" : "#dc2626", bold: true, big: true },
-                  ].map((row, i) => (
-                    <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: row.big ? "6px 8px" : "4px 8px", background: row.big ? `${row.color}10` : "transparent", borderRadius: row.big ? 6 : 0, borderTop: row.bold ? "1px solid #e2e8f0" : "none", marginTop: row.bold ? 4 : 0 }}>
-                      <span style={{ fontSize: row.big ? 13 : 12, fontWeight: row.bold ? 600 : 400, color: "#374151" }}>{row.label}</span>
-                      <span style={{ fontSize: row.big ? 15 : 13, fontWeight: row.bold ? 800 : 500, color: row.color }}>{row.value >= 0 ? "+" : ""}{fmt(row.value)} €</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Avis agent — synthèse */}
-                {conversation.filter(m => m.role === "agent").length > 0 && (
-                  <div style={{ marginBottom: 24 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#2563EB", marginBottom: 10, paddingBottom: 6, borderBottom: "1px solid #dbeafe" }}>Avis de l&apos;agent expert LMNP</div>
-                    {[
-                      conversation.filter(m => m.role === "agent")[0],
-                      conversation.filter(m => m.role === "agent").slice(-1)[0],
-                    ].filter((m, i, arr) => m && (i === 0 || arr[0]?.text !== m.text)).map((m, i) => (
-                      <div key={i} style={{ fontSize: 12, lineHeight: 1.7, color: "#1e293b", marginBottom: i === 0 ? 12 : 0, padding: "12px 16px", background: "#f8faff", borderRadius: 8, border: "1px solid #e8eeff", whiteSpace: "pre-wrap" }}>
-                        {i > 0 && <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>Analyse finale</div>}
-                        {m.text.replace(/\*\*/g, "").substring(0, 1200)}{m.text.length > 1200 ? "…" : ""}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Avantage fiscal */}
-                <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
-                  {[
-                    { label: "Amortissement annuel", value: `${fmt(results.amortissementAnnuel)} €`, sub: "immeuble 30 ans + meubles 7 ans" },
-                    { label: "Économie d'impôt estimée", value: `~${fmt(results.economieImpotAnnuelle)} €/an`, sub: "tranche 30% IR + 17.2% PS" },
-                  ].map((item, i) => (
-                    <div key={i} style={{ flex: 1, padding: "10px 14px", borderRadius: 8, background: "#f0fdf4", border: "1px solid #a7f3d0" }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: "#059669", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>{item.label}</div>
-                      <div style={{ fontSize: 16, fontWeight: 800, color: "#059669" }}>{item.value}</div>
-                      <div style={{ fontSize: 10, color: "#86efac", marginTop: 2 }}>{item.sub}</div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Footer */}
-                <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: 12, display: "flex", justifyContent: "space-between", fontSize: 10, color: "#94a3b8" }}>
-                  <span>JuNe — Simulateur LMNP · Estimation indicative, non contractuelle</span>
-                  <span>Consulte un expert-comptable spécialisé LMNP pour valider ton montage fiscal</span>
-                </div>
               </div>
             )}
           </>
