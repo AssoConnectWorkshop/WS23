@@ -74,6 +74,10 @@ interface Inputs {
   charges: number;
   vacance: number;
   travaux: number;
+  fraisAgence: number;       // € one-shot
+  taxeFonciere: number;      // €/an
+  expertComptable: number;   // €/an
+  assurancePNO: number;      // €/an
 }
 
 interface Results {
@@ -91,14 +95,17 @@ interface Results {
 
 function compute(inputs: Inputs): Results {
   const fraisNotaireEuros = inputs.prix * (inputs.fraisNotaire / 100);
-  const investissementTotal = inputs.prix + fraisNotaireEuros + inputs.ameublement + inputs.travaux;
+  const investissementTotal = inputs.prix + fraisNotaireEuros + inputs.ameublement + inputs.travaux + inputs.fraisAgence;
   const apportEuros = inputs.prix * (inputs.apport / 100);
   const montantEmprunt = investissementTotal - apportEuros;
   const mensualite = mensualiteCredit(montantEmprunt, inputs.taux, inputs.duree);
 
   const loyerMensuelBrut = inputs.loyer * (1 - inputs.vacance / 100);
+  // Charges % du loyer (copro, petites réparations, gestion locative)
   const chargesMensuelles = inputs.loyer * (inputs.charges / 100);
-  const loyerNetMensuel = loyerMensuelBrut - chargesMensuelles;
+  // Charges fixes annuelles converties en mensuel
+  const chargesFixesMensuelles = (inputs.taxeFonciere + inputs.expertComptable + inputs.assurancePNO) / 12;
+  const loyerNetMensuel = loyerMensuelBrut - chargesMensuelles - chargesFixesMensuelles;
 
   const cashFlowMensuel = loyerNetMensuel - mensualite;
   const cashFlowAnnuel = cashFlowMensuel * 12;
@@ -226,6 +233,10 @@ export default function LMNPPage() {
     charges: DEFAULT_CHARGES,
     vacance: DEFAULT_VACANCE,
     travaux: 0,
+    fraisAgence: 0,
+    taxeFonciere: 800,
+    expertComptable: 600,
+    assurancePNO: 150,
   });
   const [parsed, setParsed] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -235,8 +246,10 @@ export default function LMNPPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loyerInfo, setLoyerInfo] = useState<{ loyerM2: number; precision: string; city: string } | null>(null);
   const [contexte, setContexte] = useState("");
-  const [avis, setAvis] = useState("");
+  const [conversation, setConversation] = useState<{ role: "user" | "agent"; text: string }[]>([]);
+  const [reply, setReply] = useState("");
   const [avisLoading, setAvisLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   const set = useCallback((key: keyof Inputs, val: number | string) => {
     setInputs(prev => ({ ...prev, [key]: val }));
@@ -321,6 +334,31 @@ export default function LMNPPage() {
   };
 
   const results = inputs.prix > 0 && inputs.loyer > 0 ? compute(inputs) : null;
+
+  const sendReply = useCallback(async () => {
+    if (!reply.trim()) return;
+    const userMsg = reply.trim();
+    setReply("");
+    const newConv = [...conversation, { role: "user" as const, text: userMsg }];
+    setConversation(newConv);
+    setAvisLoading(true);
+    try {
+      const res = await fetch("/api/lmnp/avis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inputs, results, loyerInfo, conversation: newConv }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setConversation(prev => [...prev, { role: "agent", text: data.avis }]);
+      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+    } catch (e) {
+      setConversation(prev => [...prev, { role: "agent", text: `⚠️ ${(e as Error).message}` }]);
+    } finally {
+      setAvisLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reply, conversation, inputs, results, loyerInfo]);
 
   const verdict = results
     ? results.rendementNet >= 7
@@ -485,14 +523,26 @@ export default function LMNPPage() {
 
         {/* Financement */}
         <section style={{ background: "white", borderRadius: 20, padding: 24, boxShadow: "0 2px 16px rgba(0,0,0,0.07)", border: `1px solid #e2e8f0` }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, color: BLUE, marginBottom: 16 }}>💳 Financement</h2>
+          <h2 style={{ fontSize: 16, fontWeight: 700, color: BLUE, marginBottom: 16 }}>💳 Financement & charges</h2>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <Field label="Apport" value={inputs.apport} onChange={v => set("apport", v)} unit="%" min={0} step={1} />
             <Field label="Taux crédit" value={inputs.taux} onChange={v => set("taux", v)} unit="%" step={0.05} />
             <Field label="Durée" value={inputs.duree} onChange={v => set("duree", v)} unit="ans" step={1} />
             <Field label="Frais de notaire" value={inputs.fraisNotaire} onChange={v => set("fraisNotaire", v)} unit="%" step={0.1} />
+            <Field label="Frais d'agence achat" value={inputs.fraisAgence} onChange={v => set("fraisAgence", v)} step={500} />
             <Field label="Ameublement LMNP" value={inputs.ameublement} onChange={v => set("ameublement", v)} step={500} />
-            <Field label="Charges & gestion" value={inputs.charges} onChange={v => set("charges", v)} unit="%" step={1} />
+          </div>
+          <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #f0f0f0" }}>
+            <p style={{ fontSize: 12, fontWeight: 600, color: "#666", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>Charges annuelles récurrentes</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              <Field label="Taxe foncière" value={inputs.taxeFonciere} onChange={v => set("taxeFonciere", v)} step={50} />
+              <Field label="Expert-comptable" value={inputs.expertComptable} onChange={v => set("expertComptable", v)} step={50} />
+              <Field label="Assurance PNO" value={inputs.assurancePNO} onChange={v => set("assurancePNO", v)} step={25} />
+              <Field label="Gestion + copro" value={inputs.charges} onChange={v => set("charges", v)} unit="% loyer" step={1} />
+            </div>
+          </div>
+          <div style={{ marginTop: 10 }}>
+            <Field label="Vacance locative" value={inputs.vacance} onChange={v => set("vacance", v)} unit="%" step={0.5} />
           </div>
         </section>
 
@@ -523,10 +573,10 @@ export default function LMNPPage() {
               <h2 style={{ fontSize: 16, fontWeight: 700, color: BLUE, marginBottom: 16 }}>📊 Cash flow</h2>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 {[
-                  { label: "Invest. total", value: fmt(results.investissementTotal) + " €", sub: "prix + frais + meubles" },
-                  { label: "Emprunt", value: fmt(results.montantEmprunt) + " €", sub: `apport ${inputs.apport}%` },
+                  { label: "Invest. total", value: fmt(results.investissementTotal) + " €", sub: `prix + notaire${inputs.travaux > 0 ? " + travaux" : ""} + meubles` },
+                  { label: "Emprunt", value: fmt(results.montantEmprunt) + " €", sub: `apport ${inputs.apport}%${inputs.travaux > 0 ? ` · travaux ${fmt(inputs.travaux)} € financés` : ""}` },
                   { label: "Mensualité crédit", value: fmt(results.mensualiteCredit) + " €/mois", sub: `${inputs.taux}% sur ${inputs.duree} ans`, color: RED },
-                  { label: "Loyer net encaissé", value: fmt(results.loyerNetMensuel) + " €/mois", sub: `après charges (${inputs.charges}%) et vacance (${inputs.vacance}%)`, color: GREEN },
+                  { label: "Loyer net encaissé", value: fmt(results.loyerNetMensuel) + " €/mois", sub: `après charges (${inputs.charges}%), taxe foncière, assurance, expert-comptable`, color: GREEN },
                   { label: "Cash flow mensuel", value: (results.cashFlowMensuel >= 0 ? "+" : "") + fmt(results.cashFlowMensuel) + " €", sub: "loyer net - crédit", color: results.cashFlowMensuel >= -400 ? GREEN : RED, big: true },
                   { label: "Cash flow annuel", value: (results.cashFlowAnnuel >= 0 ? "+" : "") + fmt(results.cashFlowAnnuel) + " €", sub: "sur 12 mois", color: results.cashFlowAnnuel >= 0 ? GREEN : RED, big: true },
                 ].map((item, i) => (
@@ -563,67 +613,131 @@ export default function LMNPPage() {
               </p>
             </section>
 
-            {/* Avis agent */}
+            {/* Avis agent — chat */}
             <section style={{ background: "white", borderRadius: 20, padding: 24, boxShadow: "0 2px 16px rgba(0,0,0,0.07)", border: `1.5px solid ${BLUE}20` }}>
               <h2 style={{ fontSize: 16, fontWeight: 700, color: BLUE, marginBottom: 4 }}>🧑‍💼 L&apos;avis de l&apos;agent</h2>
               <p style={{ fontSize: 13, color: "#888", marginBottom: 14 }}>
-                Apporte des précisions sur le bien, le quartier, la copropriété, ton projet… L&apos;agent affinera son analyse.
+                Décris le bien, le quartier, ton projet… L&apos;agent analyse et peut te poser des questions.
               </p>
-              <textarea
-                rows={4}
-                value={contexte}
-                onChange={e => setContexte(e.target.value)}
-                placeholder={"Ex : immeuble années 70, gardien, bon état général. Quartier en cours de gentrification. Je cherche à défiscaliser sur 10 ans, pas forcément à revendre…"}
-                style={{
-                  width: "100%", padding: "12px 14px", borderRadius: 12, fontSize: 14,
-                  border: "1.5px solid #C7D2FD", outline: "none", resize: "vertical",
-                  fontFamily: "inherit", lineHeight: 1.5, boxSizing: "border-box",
-                }}
-              />
-              <button
-                onClick={async () => {
-                  setAvisLoading(true);
-                  setAvis("");
-                  try {
-                    const res = await fetch("/api/lmnp/avis", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ inputs, results, contexte, loyerInfo }),
-                    });
-                    const data = await res.json();
-                    if (!res.ok) throw new Error(data.error);
-                    setAvis(data.avis);
-                  } catch (e) {
-                    setAvis(`⚠️ ${(e as Error).message}`);
-                  } finally {
-                    setAvisLoading(false);
-                  }
-                }}
-                disabled={avisLoading}
-                style={{
-                  marginTop: 12, padding: "12px 24px", borderRadius: 12, fontSize: 15, fontWeight: 700,
-                  background: avisLoading ? "#e2e8f0" : `linear-gradient(135deg, ${BLUE}, #6366f1)`,
-                  color: avisLoading ? "#aaa" : "white", border: "none", cursor: avisLoading ? "default" : "pointer",
-                }}
-              >
-                {avisLoading ? "⏳ L'agent analyse le dossier…" : avis ? "🔄 Relancer l'analyse" : "🧑‍💼 Demander l'avis de l'agent"}
-              </button>
 
-              {avis && (
-                <div style={{ marginTop: 20, display: "flex", gap: 14, alignItems: "flex-start" }}>
-                  <div style={{
-                    width: 44, height: 44, borderRadius: "50%", flexShrink: 0, fontSize: 22,
-                    background: `linear-gradient(135deg, ${BLUE}, #6366f1)`,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                  }}>🧑‍💼</div>
-                  <div style={{
-                    flex: 1, background: "#F8FAFF", borderRadius: "4px 16px 16px 16px",
-                    padding: "16px 18px", border: `1px solid ${BLUE}20`,
-                    fontSize: 14, lineHeight: 1.7, color: "#1a1a2e",
-                    whiteSpace: "pre-wrap",
-                  }}>
-                    {avis}
-                  </div>
+              {/* Premier message si pas de conversation */}
+              {conversation.length === 0 && (
+                <>
+                  <textarea
+                    rows={4}
+                    value={contexte}
+                    onChange={e => setContexte(e.target.value)}
+                    placeholder="Ex : immeuble années 70, bon état général. Quartier en cours de gentrification. Je cherche à défiscaliser sur 10 ans…"
+                    style={{
+                      width: "100%", padding: "12px 14px", borderRadius: 12, fontSize: 14,
+                      border: "1.5px solid #C7D2FD", outline: "none", resize: "vertical",
+                      fontFamily: "inherit", lineHeight: 1.5, boxSizing: "border-box",
+                    }}
+                  />
+                  <button
+                    onClick={async () => {
+                      const userMsg = contexte.trim() || "(pas de contexte supplémentaire)";
+                      setConversation([{ role: "user", text: userMsg }]);
+                      setAvisLoading(true);
+                      try {
+                        const res = await fetch("/api/lmnp/avis", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ inputs, results, loyerInfo, conversation: [{ role: "user", text: userMsg }] }),
+                        });
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.error);
+                        setConversation(prev => [...prev, { role: "agent", text: data.avis }]);
+                        setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+                      } catch (e) {
+                        setConversation(prev => [...prev, { role: "agent", text: `⚠️ ${(e as Error).message}` }]);
+                      } finally {
+                        setAvisLoading(false);
+                      }
+                    }}
+                    disabled={avisLoading}
+                    style={{
+                      marginTop: 12, padding: "12px 24px", borderRadius: 12, fontSize: 15, fontWeight: 700,
+                      background: avisLoading ? "#e2e8f0" : `linear-gradient(135deg, ${BLUE}, #6366f1)`,
+                      color: avisLoading ? "#aaa" : "white", border: "none", cursor: avisLoading ? "default" : "pointer",
+                    }}
+                  >
+                    {avisLoading ? "⏳ Analyse en cours…" : "🧑‍💼 Demander l'avis de l'agent"}
+                  </button>
+                </>
+              )}
+
+              {/* Fil de conversation */}
+              {conversation.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  {conversation.map((msg, i) => (
+                    <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start", flexDirection: msg.role === "user" ? "row-reverse" : "row" }}>
+                      <div style={{
+                        width: 36, height: 36, borderRadius: "50%", flexShrink: 0, fontSize: 18,
+                        background: msg.role === "agent" ? `linear-gradient(135deg, ${BLUE}, #6366f1)` : "#e2e8f0",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                        {msg.role === "agent" ? "🧑‍💼" : "👤"}
+                      </div>
+                      <div style={{
+                        flex: 1, padding: "12px 16px", fontSize: 14, lineHeight: 1.7, whiteSpace: "pre-wrap",
+                        borderRadius: msg.role === "agent" ? "4px 16px 16px 16px" : "16px 4px 16px 16px",
+                        background: msg.role === "agent" ? "#F8FAFF" : "#EEF2FF",
+                        border: `1px solid ${msg.role === "agent" ? `${BLUE}20` : "#C7D2FD"}`,
+                        color: "#1a1a2e",
+                      }}>
+                        {msg.text}
+                      </div>
+                    </div>
+                  ))}
+
+                  {avisLoading && (
+                    <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                      <div style={{
+                        width: 36, height: 36, borderRadius: "50%", fontSize: 18,
+                        background: `linear-gradient(135deg, ${BLUE}, #6366f1)`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>🧑‍💼</div>
+                      <div style={{ fontSize: 13, color: "#888", fontStyle: "italic" }}>L&apos;agent rédige sa réponse…</div>
+                    </div>
+                  )}
+                  <div ref={chatEndRef} />
+
+                  {/* Champ réponse */}
+                  {!avisLoading && (
+                    <div style={{ display: "flex", gap: 10, alignItems: "flex-end", marginTop: 4 }}>
+                      <textarea
+                        rows={2}
+                        value={reply}
+                        onChange={e => setReply(e.target.value)}
+                        onKeyDown={async e => {
+                          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (!reply.trim()) return; await sendReply(); }
+                        }}
+                        placeholder="Réponds aux questions de l'agent… (Entrée pour envoyer)"
+                        style={{
+                          flex: 1, padding: "10px 14px", borderRadius: 12, fontSize: 14,
+                          border: "1.5px solid #C7D2FD", outline: "none", resize: "none",
+                          fontFamily: "inherit", lineHeight: 1.5,
+                        }}
+                      />
+                      <button
+                        onClick={sendReply}
+                        disabled={!reply.trim()}
+                        style={{
+                          padding: "10px 18px", borderRadius: 12, fontSize: 22, border: "none",
+                          background: reply.trim() ? `linear-gradient(135deg, ${BLUE}, #6366f1)` : "#e2e8f0",
+                          cursor: reply.trim() ? "pointer" : "default", flexShrink: 0,
+                        }}
+                      >➤</button>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={() => { setConversation([]); setContexte(""); setReply(""); }}
+                    style={{ alignSelf: "flex-start", fontSize: 12, color: "#aaa", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                  >
+                    ↺ Recommencer la conversation
+                  </button>
                 </div>
               )}
             </section>
