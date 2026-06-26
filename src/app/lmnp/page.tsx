@@ -131,6 +131,86 @@ function fmt(n: number, dec = 0) {
   return n.toLocaleString("fr-FR", { minimumFractionDigits: dec, maximumFractionDigits: dec });
 }
 
+interface AdresseSuggestion {
+  label: string;
+  city: string;
+  codePostal: string;
+  loyerM2: number;
+  loyerEstime: number;
+  precision: string;
+}
+
+function AddressAutocomplete({ surface, onSelect }: {
+  surface: number;
+  onSelect: (s: AdresseSuggestion) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [suggestions, setSuggestions] = useState<AdresseSuggestion[]>([]);
+  const [open, setOpen] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout>>(null);
+
+  const search = (q: string) => {
+    setQuery(q);
+    if (timer.current) clearTimeout(timer.current);
+    if (q.length < 3) { setSuggestions([]); setOpen(false); return; }
+    timer.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/adresse?q=${encodeURIComponent(q)}&surface=${surface}`);
+        const data: AdresseSuggestion[] = await res.json();
+        setSuggestions(data);
+        setOpen(data.length > 0);
+      } catch { setSuggestions([]); }
+    }, 280);
+  };
+
+  const pick = (s: AdresseSuggestion) => {
+    setQuery(s.label);
+    setOpen(false);
+    onSelect(s);
+  };
+
+  return (
+    <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 4 }}>
+      <label style={{ fontSize: 12, fontWeight: 600, color: "#666", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+        Adresse du bien
+      </label>
+      <input
+        type="text"
+        value={query}
+        onChange={e => search(e.target.value)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        placeholder="Ex : 12 rue de la Paix, Lyon 2..."
+        style={{ padding: "10px 12px", borderRadius: 10, fontSize: 15, border: "1.5px solid #C7D2FD", outline: "none" }}
+      />
+      {open && (
+        <div style={{
+          position: "absolute", top: "100%", left: 0, right: 0, zIndex: 50,
+          background: "white", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+          border: "1px solid #e2e8f0", overflow: "hidden", marginTop: 4,
+        }}>
+          {suggestions.map((s, i) => (
+            <div
+              key={i}
+              onMouseDown={() => pick(s)}
+              style={{
+                padding: "10px 14px", cursor: "pointer", borderBottom: i < suggestions.length - 1 ? "1px solid #f0f0f0" : "none",
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = "#F4F6FB")}
+              onMouseLeave={e => (e.currentTarget.style.background = "white")}
+            >
+              <span style={{ fontSize: 14 }}>{s.label}</span>
+              <span style={{ fontSize: 12, color: BLUE, fontWeight: 700, whiteSpace: "nowrap", marginLeft: 8 }}>
+                ~{s.loyerM2} €/m²
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function LMNPPage() {
   const [inputs, setInputs] = useState<Inputs>({
     annonce: "",
@@ -153,6 +233,7 @@ export default function LMNPPage() {
   const [images, setImages] = useState<string[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [loyerInfo, setLoyerInfo] = useState<{ loyerM2: number; precision: string; city: string } | null>(null);
 
   const set = useCallback((key: keyof Inputs, val: number | string) => {
     setInputs(prev => ({ ...prev, [key]: val }));
@@ -374,35 +455,27 @@ export default function LMNPPage() {
         <section style={{ background: "white", borderRadius: 20, padding: 24, boxShadow: "0 2px 16px rgba(0,0,0,0.07)", border: `1px solid #e2e8f0` }}>
           <h2 style={{ fontSize: 16, fontWeight: 700, color: BLUE, marginBottom: 16 }}>🏢 Le bien</h2>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-            <div style={{ gridColumn: "1/-1", display: "flex", flexDirection: "column", gap: 4 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "#666", textTransform: "uppercase", letterSpacing: "0.05em" }}>Ville</label>
-              <input
-                type="text" value={inputs.ville}
-                onChange={e => {
-                  const v = e.target.value;
-                  setInputs(prev => ({
-                    ...prev,
-                    ville: v,
-                    loyer: prev.surface > 0 ? loyerEstime(prev.surface, v) : prev.loyer,
-                  }));
+            <div style={{ gridColumn: "1/-1" }}>
+              <AddressAutocomplete
+                surface={inputs.surface || 30}
+                onSelect={({ city, codePostal, loyerEstime: loyer, loyerM2, precision }) => {
+                  setInputs(prev => ({ ...prev, ville: city, loyer: prev.surface > 0 ? loyer : prev.loyer }));
+                  setLoyerInfo({ loyerM2, precision, city });
                 }}
-                placeholder="Paris, Lyon, Bordeaux..."
-                style={{ padding: "10px 12px", borderRadius: 10, fontSize: 15, border: "1.5px solid #C7D2FD", outline: "none" }}
               />
             </div>
             <Field label="Prix d'achat" value={inputs.prix} onChange={v => set("prix", v)} step={1000} />
             <Field label="Surface" value={inputs.surface} onChange={v => {
-              setInputs(prev => ({
-                ...prev, surface: v,
-                loyer: v > 0 ? loyerEstime(v, prev.ville) : prev.loyer,
-              }));
+              setInputs(prev => ({ ...prev, surface: v }));
             }} unit="m²" />
             <Field label="Loyer mensuel estimé" value={inputs.loyer} onChange={v => set("loyer", v)} />
             <Field label="Budget travaux" value={inputs.travaux} onChange={v => set("travaux", v)} step={500} />
           </div>
-          {inputs.loyer > 0 && inputs.surface > 0 && (
+          {loyerInfo && inputs.loyer > 0 && (
             <p style={{ marginTop: 12, fontSize: 13, color: "#888" }}>
-              💡 Loyer estimé : <strong>{fmt(inputs.loyer / inputs.surface, 1)} €/m²</strong> — à vérifier sur Leboncoin/PAP pour {inputs.ville || "ta ville"}
+              💡 <strong>{fmt(loyerInfo.loyerM2, 0)} €/m²</strong> estimé
+              {loyerInfo.precision === "arrondissement" ? ` dans cet arrondissement` : loyerInfo.precision === "codePostal" ? ` dans ce secteur` : ` à ${loyerInfo.city}`}
+              {" "}— données observatoires 2025, à vérifier sur PAP/Leboncoin
             </p>
           )}
         </section>

@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
+import { estimerLoyerParAdresse } from "./loyers";
 
 const anthropic = process.env.ANTHROPIC_API_KEY
   ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -19,45 +20,9 @@ export interface ParsedListing {
   loyerM2: number;
 }
 
-const RENTAL_PRICES_M2: Record<string, number> = {
-  paris: 35,
-  lyon: 18,
-  bordeaux: 17,
-  marseille: 15,
-  toulouse: 15,
-  nantes: 16,
-  montpellier: 16,
-  lille: 17,
-  strasbourg: 16,
-  rennes: 16,
-  nice: 22,
-  grenoble: 14,
-  toulon: 14,
-  angers: 13,
-  reims: 12,
-  dijon: 13,
-  metz: 12,
-  nancy: 12,
-  clermont: 11,
-  rouen: 13,
-  tours: 13,
-  saint: 12,
-  caen: 12,
-};
-
-function estimerLoyer(ville: string, surface: number): { loyer: number; loyerM2: number } {
-  const villeLower = ville.toLowerCase().replace(/-/g, " ");
-  let loyerM2 = 12;
-
-  for (const [key, prix] of Object.entries(RENTAL_PRICES_M2)) {
-    if (villeLower.includes(key)) {
-      loyerM2 = prix;
-      break;
-    }
-  }
-
-  const loyer = Math.round(loyerM2 * surface);
-  return { loyer, loyerM2 };
+function estimerLoyer(ville: string, surface: number, codePostal?: string): { loyer: number; loyerM2: number } {
+  const { loyerM2 } = estimerLoyerParAdresse({ city: ville, codePostal, surface });
+  return { loyer: Math.round(loyerM2 * surface), loyerM2 };
 }
 
 function extractFromText(text: string): { prix: number; surface: number; ville: string; nbPieces: number; estNeuf: boolean; codePostal: string } {
