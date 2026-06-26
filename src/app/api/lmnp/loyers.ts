@@ -18,9 +18,9 @@ const LYON_PAR_ARRONDISSEMENT: Record<number, number> = {
 
 // Marseille : par arrondissement (code postal 130XX)
 const MARSEILLE_PAR_ARRONDISSEMENT: Record<number, number> = {
-  1: 16, 2: 13, 3: 12, 4: 13, 5: 12, 6: 17,
-  7: 18, 8: 19, 9: 15, 10: 12, 11: 11, 12: 12,
-  13: 11, 14: 11, 15: 10, 16: 10,
+  1: 17, 2: 14, 3: 12, 4: 13, 5: 12, 6: 19,
+  7: 21, 8: 23, 9: 17, 10: 13, 11: 12, 12: 13,
+  13: 12, 14: 11, 15: 10, 16: 10,
 };
 
 // Bordeaux : par secteur (code postal 3300X)
