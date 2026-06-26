@@ -18,15 +18,24 @@ export async function POST(req: NextRequest) {
     conversation: { role: "user" | "agent"; text: string }[];
   };
 
+  const localisationDetail = [
+    inputs.ville ? `ville/quartier : ${inputs.ville}` : null,
+    loyerInfo?.city && loyerInfo.city !== inputs.ville ? `commune : ${loyerInfo.city}` : null,
+    loyerInfo ? `loyer de marché : ${loyerInfo.loyerM2} €/m² (précision ${loyerInfo.precision})` : null,
+  ].filter(Boolean).join(", ");
+
   const systemPrompt = `Tu es un agent immobilier expert en investissement locatif LMNP, avec 15 ans d'expérience. Tu analyses des dossiers avec franchise et précision.
 
-Dossier en cours :
-- Prix d'achat : ${Number(inputs.prix).toLocaleString("fr-FR")} € | Surface : ${inputs.surface} m² | Localisation : ${inputs.ville || "non précisée"}${loyerInfo ? ` (loyer ${loyerInfo.loyerM2}€/m², précision : ${loyerInfo.precision})` : ""}
-- Travaux : ${Number(inputs.travaux || 0).toLocaleString("fr-FR")} € | Loyer estimé : ${inputs.loyer} €/mois
-- Apport : ${inputs.apport}% | Taux : ${inputs.taux}% sur ${inputs.duree} ans | Mensualité : ${Math.round(results.mensualiteCredit)} €/mois
-- Investissement total : ${Math.round(results.investissementTotal).toLocaleString("fr-FR")} € | Cash-flow : ${Math.round(results.cashFlowMensuel)} €/mois
-- Rendement brut : ${results.rendementBrut?.toFixed(2)}% | Net : ${results.rendementNet?.toFixed(2)}%
-- Amortissement LMNP : ${Math.round(results.amortissementAnnuel).toLocaleString("fr-FR")} €/an | Éco. impôt : ~${Math.round(results.economieImpotAnnuelle).toLocaleString("fr-FR")} €/an`;
+DONNÉES COMPLÈTES DU DOSSIER — tout ce qui suit est déjà connu, ne pose JAMAIS de question là-dessus :
+- Localisation : ${localisationDetail || "non précisée"}
+- Prix d'achat : ${Number(inputs.prix).toLocaleString("fr-FR")} € | Surface : ${inputs.surface} m²
+- Loyer estimé : ${inputs.loyer} €/mois | Travaux prévus : ${Number(inputs.travaux || 0).toLocaleString("fr-FR")} €
+- Apport : ${inputs.apport}% | Taux crédit : ${inputs.taux}% sur ${inputs.duree} ans
+- Mensualité : ${Math.round(results?.mensualiteCredit ?? 0)} €/mois | Investissement total : ${Math.round(results?.investissementTotal ?? 0).toLocaleString("fr-FR")} €
+- Cash-flow mensuel : ${Math.round(results?.cashFlowMensuel ?? 0)} € | Annuel : ${Math.round(results?.cashFlowAnnuel ?? 0)} €
+- Rendement brut : ${results?.rendementBrut?.toFixed(2)}% | Net : ${results?.rendementNet?.toFixed(2)}%
+- Charges annuelles : taxe foncière ${inputs.taxeFonciere} €, expert-comptable ${inputs.expertComptable} €, PNO ${inputs.assurancePNO} €, gestion+copro ${inputs.charges}% du loyer, vacance ${inputs.vacance}%
+- Amortissement LMNP : ${Math.round(results?.amortissementAnnuel ?? 0).toLocaleString("fr-FR")} €/an | Économie impôt : ~${Math.round(results?.economieImpotAnnuelle ?? 0).toLocaleString("fr-FR")} €/an`;
 
   // Build conversation history — first user message triggers full analysis, subsequent are follow-ups
   const isFirstMessage = conversation.filter(m => m.role === "agent").length === 0;
@@ -42,7 +51,7 @@ Dossier en cours :
 **2. CE QUI EST SOLIDE / CE QUI M'INQUIÈTE** (points forts et risques, bullet points avec des chiffres)
 **3. MES QUESTIONS** (3 à 5 questions précises pour affiner l'analyse)
 
-IMPORTANT pour les questions : toutes les données financières du dossier (prix, surface, loyer, apport, taux, durée, travaux, charges, rendements, cash-flow, amortissement) sont déjà connues — ne les demande pas. Pose uniquement des questions sur ce qui n'est pas dans le dossier : DPE, charges de copropriété, situation locative actuelle, concurrence locative dans le quartier, projet de revente, profil fiscal de l'investisseur, etc.
+RÈGLE ABSOLUE sur les questions : tout ce qui est dans le dossier ci-dessus est DÉJÀ CONNU — n'en parle pas, ne le demande pas, ne le redemande pas (y compris la ville, le quartier, l'arrondissement, le prix, la surface, le loyer, les charges, le taux, la durée, l'apport…). Pose uniquement des questions sur ce qui est ABSENT du dossier : état du bien (cuisine, sdb, isolation), DPE, syndic et charges de copro réelles, situation locative actuelle (libre ou occupé), profil fiscal de l'investisseur (TMI, déjà propriétaire ?), horizon d'investissement, projet de revente, concurrence locative dans la rue.
 
 Si l'investisseur décrit l'état du bien (cuisine vétuste, salle de bain à refaire, travaux de peinture, etc.) ou partage des photos, estime un budget travaux chiffré avec cette formule : "Budget travaux estimé : X €" (remplace X par le montant en chiffres). Sois précis et réaliste.
 Sois direct, sans langue de bois. Réponds en français.`,
