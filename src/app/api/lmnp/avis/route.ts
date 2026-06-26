@@ -42,6 +42,12 @@ DONNÉES COMPLÈTES DU DOSSIER — tout ce qui suit est déjà connu, ne pose JA
 
   const messages: Anthropic.MessageParam[] = [];
 
+  const RULES = `
+RÈGLE ABSOLUE sur les questions : tout ce qui est dans le dossier ci-dessus est DÉJÀ CONNU — n'en parle pas, ne le demande pas. Pose uniquement des questions sur ce qui est ABSENT : état du bien (cuisine, sdb, isolation), DPE, syndic et charges de copro réelles, situation locative (libre ou occupé), profil fiscal (TMI, déjà propriétaire ?), horizon d'investissement, projet de revente, concurrence locative dans la rue.
+Si l'investisseur décrit l'état du bien ou partage des photos, estime un budget travaux avec : "Budget travaux estimé : X €". Sois précis.
+TERMINE TOUJOURS ta réponse par une section **MES QUESTIONS** avec 2 à 4 questions précises sur ce qui manque encore — même sur un message de suivi. L'objectif est de construire un dossier complet.
+Sois direct, sans langue de bois. Réponds en français.`;
+
   if (isFirstMessage) {
     const userContext = conversation[0]?.text ?? "";
     messages.push({
@@ -50,11 +56,7 @@ DONNÉES COMPLÈTES DU DOSSIER — tout ce qui suit est déjà connu, ne pose JA
 **1. TON VERDICT** (2-3 phrases directes — dis clairement si c'est un bon deal ou pas et pourquoi)
 **2. CE QUI EST SOLIDE / CE QUI M'INQUIÈTE** (points forts et risques, bullet points avec des chiffres)
 **3. MES QUESTIONS** (3 à 5 questions précises pour affiner l'analyse)
-
-RÈGLE ABSOLUE sur les questions : tout ce qui est dans le dossier ci-dessus est DÉJÀ CONNU — n'en parle pas, ne le demande pas, ne le redemande pas (y compris la ville, le quartier, l'arrondissement, le prix, la surface, le loyer, les charges, le taux, la durée, l'apport…). Pose uniquement des questions sur ce qui est ABSENT du dossier : état du bien (cuisine, sdb, isolation), DPE, syndic et charges de copro réelles, situation locative actuelle (libre ou occupé), profil fiscal de l'investisseur (TMI, déjà propriétaire ?), horizon d'investissement, projet de revente, concurrence locative dans la rue.
-
-Si l'investisseur décrit l'état du bien (cuisine vétuste, salle de bain à refaire, travaux de peinture, etc.) ou partage des photos, estime un budget travaux chiffré avec cette formule : "Budget travaux estimé : X €" (remplace X par le montant en chiffres). Sois précis et réaliste.
-Sois direct, sans langue de bois. Réponds en français.`,
+${RULES}`,
     });
   } else {
     // Rebuild full conversation
@@ -65,9 +67,16 @@ Sois direct, sans langue de bois. Réponds en français.`,
         messages.push({ role: "assistant", content: msg.text });
       }
     }
-    // If last message is from agent, add a prompt to continue
-    if (messages[messages.length - 1]?.role === "assistant") {
-      messages.push({ role: "user", content: "(attends la réponse de l'investisseur)" });
+    // Inject follow-up instruction
+    const lastRole = messages[messages.length - 1]?.role;
+    const followUp = `Réponds à ce que l'investisseur vient de dire, intègre les nouveaux éléments dans ton analyse (chiffre les impacts si possible), puis TERMINE obligatoirement par **MES QUESTIONS** avec 2 à 4 nouvelles questions précises sur ce qui manque encore pour compléter le dossier.
+${RULES}`;
+    if (lastRole === "assistant") {
+      messages.push({ role: "user", content: followUp });
+    } else {
+      // Append instruction to last user message
+      const last = messages[messages.length - 1];
+      messages[messages.length - 1] = { role: "user", content: `${last.content}\n\n${followUp}` };
     }
   }
 
