@@ -685,40 +685,68 @@ export default function LMNPPage() {
     await callAvis(newConv, inputs, results);
   }, [conversation, inputs, results, callAvis]);
 
-  const integrateAndRefresh = useCallback(async () => {
-    // Parse PARAMÈTRES À RÉVISER section from last agent message
+  // Parse ALL agent messages for proposed changes — robust multi-pattern extraction
+  const parseProposals = useCallback((): Partial<Inputs> => {
+    const allAgent = conversation.filter(m => m.role === "agent").map(m => m.text).join("\n");
     const lastAgent = [...conversation].reverse().find(m => m.role === "agent")?.text ?? "";
     const updated: Partial<Inputs> = {};
 
-    // Parse structured block: **PARAMÈTRES À RÉVISER** : loyer → 650 €/mois | travaux → 20 000 €
-    const block = lastAgent.match(/PARAMÈTRES\s+[ÀA]\s+RÉVISER[^:\n]*:?\s*([^\n]+)/i)?.[1] ?? lastAgent;
+    // Priority: last message structured block, then last message free text, then full history
+    const sources = [
+      lastAgent.match(/PARAM[EÈ]TRES?\s+[ÀA]\s+R[EÉ]VISER[^:\n]*:?\s*([^\n]+)/i)?.[1],
+      lastAgent,
+      allAgent,
+    ].filter(Boolean) as string[];
 
-    const loyerM = block.match(/loyer\s*[→:]\s*([\d\s]+)\s*€/i);
-    if (loyerM) { const v = parseInt(loyerM[1].replace(/\s/g, "")); if (v >= 200 && v <= 10000) updated.loyer = v; }
+    for (const src of sources) {
+      if (!updated.loyer) {
+        const m = src.match(/loyer\s*[→:à]\s*\*{0,2}([\d\s]+)\s*€(?:\/mois)?/i)
+          || src.match(/([\d\s]{3,5})\s*€\/mois(?:\s+de\s+loyer|\s+pour\s+le\s+loyer)/i)
+          || src.match(/loyer\s+(?:potentiel|réaliste|estimé|mensuel|à|de)\s+\*{0,2}([\d\s]{3,5})\s*€/i)
+          || src.match(/passer\s+le\s+loyer\s+[àa]\s+([\d\s]+)\s*€/i)
+          || src.match(/loyer\s+[àa]\s+([\d\s]+)\s*€/i);
+        if (m) { const v = parseInt(m[1].replace(/\s/g, "")); if (v >= 200 && v <= 10000) updated.loyer = v; }
+      }
+      if (!updated.travaux) {
+        const m = src.match(/(?:budget\s+)?travaux\s*[→:à]\s*\*{0,2}([\d\s]+)\s*€/i)
+          || src.match(/Budget\s+travaux\s+estimé\s*:\s*\*{0,2}([\d\s]+)\s*€/i)
+          || src.match(/travaux\s+(?:estimés?\s+[àa]|de|:)\s*([\d\s]+)\s*€/i);
+        if (m) { const v = parseInt(m[1].replace(/\s/g, "")); if (v >= 500) updated.travaux = v; }
+      }
+      if (!updated.taux) {
+        const m = src.match(/taux\s*[→:à]\s*([\d,.]+)\s*%/i)
+          || src.match(/taux\s+(?:de|à|:)\s*([\d,.]+)\s*%/i);
+        if (m) { const v = parseFloat(m[1].replace(",", ".")); if (v >= 1 && v <= 10) updated.taux = v; }
+      }
+      if (!updated.prix) {
+        const m = src.match(/prix\s*[→:à]\s*([\d\s]+)\s*€/i)
+          || src.match(/négocier\s+(?:à|autour\s+de)\s*([\d\s]+)\s*€/i)
+          || src.match(/prix\s+d['']achat\s+[àa]\s+([\d\s]+)\s*€/i);
+        if (m) { const v = parseInt(m[1].replace(/\s/g, "")); if (v >= 10000 && v <= 5000000) updated.prix = v; }
+      }
+    }
+    return updated;
+  }, [conversation]);
 
-    const travauxM = block.match(/travaux\s*[→:]\s*([\d\s]+)\s*€/i)
-      || lastAgent.match(/Budget\s+travaux\s+estimé\s*:\s*([\d\s]+)\s*€/i);
-    if (travauxM) { const v = parseInt(travauxM[1].replace(/\s/g, "")); if (v >= 1000) updated.travaux = v; }
-
-    const tauxM = block.match(/taux\s*[→:]\s*([\d,.]+)\s*%/i);
-    if (tauxM) { const v = parseFloat(tauxM[1].replace(",", ".")); if (v >= 1 && v <= 10) updated.taux = v; }
-
+  const integrateAndRefresh = useCallback(async () => {
+    const updated = parseProposals();
     if (Object.keys(updated).length > 0) setInputs(prev => ({ ...prev, ...updated }));
 
     const items = [
       updated.loyer ? `loyer → ${updated.loyer} €/mois` : null,
       updated.travaux ? `travaux → ${updated.travaux.toLocaleString("fr-FR")} €` : null,
       updated.taux ? `taux → ${updated.taux}%` : null,
+      updated.prix ? `prix → ${updated.prix.toLocaleString("fr-FR")} €` : null,
     ].filter(Boolean);
     const msg = items.length > 0
-      ? `OK, j'intègre : ${items.join(", ")}. Refais l'analyse complète avec ces chiffres.`
+      ? `OK, j'intègre : ${items.join(", ")}. Refais l'analyse complète avec ces chiffres mis à jour.`
       : "Refais l'analyse complète en tenant compte de tout ce qu'on a discuté.";
     const newConv = [...conversation, { role: "user" as const, text: msg }];
     setConversation(newConv);
     const nextInputs = { ...inputs, ...updated };
     const nextResults = nextInputs.prix > 0 && nextInputs.loyer > 0 ? compute(nextInputs) : null;
     await callAvis(newConv, nextInputs, nextResults);
-  }, [conversation, inputs, callAvis]);
+  }, [conversation, inputs, callAvis, parseProposals]);
 
   const verdict = results
     ? results.rendementNet >= 7
@@ -1319,22 +1347,39 @@ export default function LMNPPage() {
               </div>
 
               {/* Intégrer et relancer */}
-              {conversation.some(m => m.role === "agent") && !avisLoading && (
-                <div style={{ padding: "12px 20px", borderTop: `1px solid ${BORDER}`, background: "#F8FAFF" }} className="no-print">
-                  <button
-                    onClick={integrateAndRefresh}
-                    style={{
-                      width: "100%", padding: "12px 20px", borderRadius: 10, fontSize: 14, fontWeight: 700,
-                      background: "linear-gradient(135deg, #10B981, #059669)",
-                      color: "white", border: "none", cursor: "pointer",
-                      display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                    }}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>
-                    Intégrer et relancer
-                  </button>
-                </div>
-              )}
+              {conversation.some(m => m.role === "agent") && !avisLoading && (() => {
+                const proposals = parseProposals();
+                const chips = [
+                  proposals.loyer ? `Loyer → ${proposals.loyer} €/mois` : null,
+                  proposals.prix ? `Prix → ${proposals.prix.toLocaleString("fr-FR")} €` : null,
+                  proposals.travaux ? `Travaux → ${proposals.travaux.toLocaleString("fr-FR")} €` : null,
+                  proposals.taux ? `Taux → ${proposals.taux}%` : null,
+                ].filter(Boolean) as string[];
+                return (
+                  <div style={{ padding: "12px 20px", borderTop: `1px solid ${BORDER}`, background: "#F0FDF4" }} className="no-print">
+                    {chips.length > 0 && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+                        <span style={{ fontSize: 11, color: "#059669", fontWeight: 600, alignSelf: "center" }}>Détecté :</span>
+                        {chips.map((c, i) => (
+                          <span key={i} style={{ fontSize: 12, fontWeight: 700, color: "#065f46", background: "#D1FAE5", borderRadius: 6, padding: "3px 10px", border: "1px solid #A7F3D0" }}>{c}</span>
+                        ))}
+                      </div>
+                    )}
+                    <button
+                      onClick={integrateAndRefresh}
+                      style={{
+                        width: "100%", padding: "11px 20px", borderRadius: 10, fontSize: 14, fontWeight: 700,
+                        background: "linear-gradient(135deg, #10B981, #059669)",
+                        color: "white", border: "none", cursor: "pointer",
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                      }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>
+                      {chips.length > 0 ? "Intégrer ces chiffres et relancer l'analyse" : "Relancer l'analyse avec les hypothèses discutées"}
+                    </button>
+                  </div>
+                );
+              })()}
 
               {/* Reply bar */}
               <div style={{ borderTop: `1px solid ${BORDER}`, padding: "14px 20px", background: "#FAFBFF" }} className="no-print">
