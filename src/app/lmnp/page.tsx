@@ -502,8 +502,8 @@ export default function LMNPPage() {
       <label style={{ fontSize: 12, fontWeight: 500, color: "#6B7280" }}>{label}</label>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <input
-          type="number" value={value || ""} min={min} step={step}
-          onChange={e => onChange(parseFloat(e.target.value) || 0)}
+          type="text" inputMode="decimal" value={value || ""}
+          onChange={e => onChange(parseFloat(e.target.value.replace(/,/g, ".")) || 0)}
           style={{
             width: "100%", padding: "10px 14px", borderRadius: 10, fontSize: 15, fontWeight: 600,
             border: `1.5px solid #DDE5FF`, outline: "none", background: "white", fontFamily: "inherit",
