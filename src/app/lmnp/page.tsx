@@ -22,6 +22,58 @@ const DEFAULT_AMEUBLEMENT = 8000;
 const DEFAULT_CHARGES = 15; // % du loyer (copro, taxe foncière, assurance, gestion)
 const DEFAULT_VACANCE = 5; // % du temps vacant
 
+function Field({ label, value, onChange, unit = "€", min = 0 }: {
+  label: string; value: number; onChange: (v: number) => void;
+  unit?: string; min?: number;
+}) {
+  const [local, setLocal] = useState(value === 0 ? "" : String(value));
+  const focused = useRef(false);
+
+  // Sync external value changes (e.g. autofill from listing) when not focused
+  useEffect(() => {
+    if (!focused.current) {
+      setLocal(value === 0 ? "" : String(value));
+    }
+  }, [value]);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+      <label style={{ fontSize: 13, fontWeight: 500, color: MUTED }}>{label}</label>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <input
+          type="text" inputMode="decimal" value={local}
+          onChange={e => {
+            const raw = e.target.value.replace(/,/g, ".");
+            setLocal(raw);
+            const num = parseFloat(raw);
+            if (!isNaN(num) && num >= min) onChange(num);
+            else if (raw === "" || raw === "-") onChange(0);
+          }}
+          onFocus={e => {
+            focused.current = true;
+            e.target.select();
+            e.target.style.borderColor = BLUE;
+          }}
+          onBlur={e => {
+            focused.current = false;
+            const num = parseFloat(local.replace(/,/g, "."));
+            const final = isNaN(num) ? 0 : Math.max(min, num);
+            setLocal(final === 0 ? "" : String(final));
+            onChange(final);
+            e.target.style.borderColor = BORDER;
+          }}
+          style={{
+            width: "100%", padding: "10px 14px", borderRadius: 10, fontSize: 15, fontWeight: 600,
+            border: `1.5px solid ${BORDER}`, outline: "none", background: "white",
+            fontFamily: "inherit", color: TEXT,
+          }}
+        />
+        <span style={{ color: MUTED, fontWeight: 500, fontSize: 13, minWidth: 28, flexShrink: 0 }}>{unit}</span>
+      </div>
+    </div>
+  );
+}
+
 function parseListingText(text: string) {
   const prixMatch = text.match(/(\d[\d\s]*)\s*€(?:\s*FAI)?(?:\s*\*)?/i) ||
     text.match(/prix[^:]*:\s*([\d\s]+)/i) ||
@@ -768,29 +820,6 @@ export default function LMNPPage() {
 
   const suggere = tauxMarche(inputs.duree, inputs.apport);
 
-  // Field component
-  const Field = ({ label, value, onChange, unit = "€", step = 1, min = 0 }: {
-    label: string; value: number; onChange: (v: number) => void;
-    unit?: string; step?: number; min?: number;
-  }) => (
-    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-      <label style={{ fontSize: 13, fontWeight: 500, color: MUTED }}>{label}</label>
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <input
-          type="text" inputMode="decimal" value={value || ""}
-          onChange={e => onChange(parseFloat(e.target.value.replace(/,/g, ".")) || 0)}
-          style={{
-            width: "100%", padding: "10px 14px", borderRadius: 10, fontSize: 15, fontWeight: 600,
-            border: `1.5px solid ${BORDER}`, outline: "none", background: "white",
-            fontFamily: "inherit", color: TEXT,
-          }}
-          onFocus={e => (e.target.style.borderColor = BLUE)}
-          onBlur={e => (e.target.style.borderColor = BORDER)}
-        />
-        <span style={{ color: MUTED, fontWeight: 500, fontSize: 13, minWidth: 28, flexShrink: 0 }}>{unit}</span>
-      </div>
-    </div>
-  );
 
   // ── Layout ──────────────────────────────────────────────────────────────────
   return (
@@ -938,7 +967,7 @@ export default function LMNPPage() {
           <section style={card}>
             <SectionHeader label="Le bien" />
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              <Field label="Prix d'achat" value={inputs.prix} onChange={v => set("prix", v)} step={1000} />
+              <Field label="Prix d'achat" value={inputs.prix} onChange={v => set("prix", v)} />
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                 <Field label="Surface" value={inputs.surface} onChange={v => setInputs(prev => ({ ...prev, surface: v }))} unit="m²" />
                 <div>
@@ -973,9 +1002,9 @@ export default function LMNPPage() {
           <section style={card}>
             <SectionHeader label="Financement" />
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-              <Field label="Apport" value={inputs.apport} onChange={v => set("apport", v)} unit="%" step={1} />
+              <Field label="Apport" value={inputs.apport} onChange={v => set("apport", v)} unit="%" />
               <div>
-                <Field label="Taux crédit" value={inputs.taux} onChange={v => set("taux", v)} unit="%" step={0.05} />
+                <Field label="Taux crédit" value={inputs.taux} onChange={v => set("taux", v)} unit="%" />
                 <button
                   onClick={() => { setTauxManuel(false); set("taux", suggere); }}
                   style={{
@@ -986,7 +1015,7 @@ export default function LMNPPage() {
                   {tauxManuel ? `Revenir au marché : ${suggere}%` : `Taux marché auto : ${suggere}%`}
                 </button>
               </div>
-              <Field label="Durée" value={inputs.duree} onChange={v => set("duree", v)} unit="ans" step={1} />
+              <Field label="Durée" value={inputs.duree} onChange={v => set("duree", v)} unit="ans" />
             </div>
             {results && (
               <p style={{ marginTop: 14, fontSize: 13, color: MUTED }}>
@@ -1015,15 +1044,15 @@ export default function LMNPPage() {
 
             {chargesOpen && (
               <div style={{ marginTop: 18, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                <Field label="Travaux (€)" value={inputs.travaux} onChange={v => set("travaux", v)} step={500} />
-                <Field label="Frais notaire (%)" value={inputs.fraisNotaire} onChange={v => set("fraisNotaire", v)} unit="%" step={0.1} />
-                <Field label="Ameublement (€)" value={inputs.ameublement} onChange={v => set("ameublement", v)} step={500} />
-                <Field label="Taxe foncière (€/an)" value={inputs.taxeFonciere} onChange={v => set("taxeFonciere", v)} step={50} />
-                <Field label="Frais agence (€)" value={inputs.fraisAgence} onChange={v => set("fraisAgence", v)} step={500} />
-                <Field label="Expert-comptable (€/an)" value={inputs.expertComptable} onChange={v => set("expertComptable", v)} step={50} />
-                <Field label="Charges & gestion (% loyer)" value={inputs.charges} onChange={v => set("charges", v)} unit="%" step={1} />
-                <Field label="Assurance PNO (€/an)" value={inputs.assurancePNO} onChange={v => set("assurancePNO", v)} step={25} />
-                <Field label="Vacance locative (%)" value={inputs.vacance} onChange={v => set("vacance", v)} unit="%" step={0.5} />
+                <Field label="Travaux (€)" value={inputs.travaux} onChange={v => set("travaux", v)} />
+                <Field label="Frais notaire (%)" value={inputs.fraisNotaire} onChange={v => set("fraisNotaire", v)} unit="%" />
+                <Field label="Ameublement (€)" value={inputs.ameublement} onChange={v => set("ameublement", v)} />
+                <Field label="Taxe foncière (€/an)" value={inputs.taxeFonciere} onChange={v => set("taxeFonciere", v)} />
+                <Field label="Frais agence (€)" value={inputs.fraisAgence} onChange={v => set("fraisAgence", v)} />
+                <Field label="Expert-comptable (€/an)" value={inputs.expertComptable} onChange={v => set("expertComptable", v)} />
+                <Field label="Charges & gestion (% loyer)" value={inputs.charges} onChange={v => set("charges", v)} unit="%" />
+                <Field label="Assurance PNO (€/an)" value={inputs.assurancePNO} onChange={v => set("assurancePNO", v)} />
+                <Field label="Vacance locative (%)" value={inputs.vacance} onChange={v => set("vacance", v)} unit="%" />
               </div>
             )}
           </section>
