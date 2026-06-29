@@ -551,7 +551,7 @@ export default function LMNPPage() {
   const [etatBien, setEtatBien] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
   const [chargesOpen, setChargesOpen] = useState(true);
-  const [cfDetailOpen, setCfDetailOpen] = useState(false);
+  const [cfDetailOpen, setCfDetailOpen] = useState(true);
   const [lectureOpen, setLectureOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [tauxManuel, setTauxManuel] = useState(false);
